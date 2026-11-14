@@ -1,5 +1,10 @@
 # CAR IN (카인)
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/carin-logo-dark.png">
+  <img src="docs/images/carin-logo-light.png" alt="CAR IN 로고" width="420">
+</picture>
+
 > **차 안에서 시작된 노래, 오래도록 남을 추억.**
 
 ![CAR IN 차량 서비스 콘셉트 시안](docs/images/service-overview.webp)
@@ -9,6 +14,8 @@ CAR IN은 **자동차의 목적지와 사용자가 남긴 음악 기록을 연�
 현대자동차그룹 **Pleos Connect 차량용 앱 개발 공모전** 출품 프로젝트입니다. 이 저장소에는 핵심 경험을 직접 시연할 수 있는 Android MVP가 들어 있습니다.
 
 > 위 이미지는 서비스 방향을 보여 주는 **디자인 시안**입니다. 실제 앱 화면과 구현 범위는 아래의 기능 현황을 기준으로 확인해 주세요.
+
+> **저장소 반영 상태:** 아래의 MVP 설명은 현재 공개된 소스를 기준으로 합니다. 백그라운드 재생과 제출용 APK는 별도 개발 환경에서 커밋·검증됐지만, 아직 이 원격 저장소에 푸시되지 않았습니다. 두 작업의 검증 내용은 아래에 따로 기록했습니다.
 
 ## 우리가 만들고 싶은 경험
 
@@ -31,12 +38,16 @@ CAR IN은 **자동차의 목적지와 사용자가 남긴 음악 기록을 연�
 
 위 화면은 모바일 연동과 여행 앨범까지 포함한 **전체 서비스 디자인 시안**입니다. 현재 저장소는 Pleos Connect 차량 앱 중심의 MVP이며, 시안 속 휴대폰 앱·실제 이동 경로·거리와 시간 통계·QR 공동 선곡·공유 기능은 구현되지 않았습니다.
 
+이 README의 이미지는 모두 팀이 프로젝트에 제공한 이미지 파일을 사용했습니다. **시안은 실제 에뮬레이터 캡처가 아니며**, 화면의 수치와 사진은 기능 설명을 위한 예시입니다.
+
 <details>
 <summary><strong>향후 확장 콘셉트 이미지 보기</strong></summary>
 
 ### 여행 기록 공유
 
-![가족 여행 기록의 SNS 스토리 공유 콘셉트](docs/images/story-sharing-concept.webp)
+| 커플 여행 | 가족 크리스마스 여행 | 친구들과 여름 바다 |
+| :---: | :---: | :---: |
+| <img src="docs/images/story-sharing-couple.webp" alt="커플 여행 Drive Story 공유 시안" width="240"> | <img src="docs/images/story-sharing-family.webp" alt="가족 크리스마스 여행 Drive Story 공유 시안" width="240"> | <img src="docs/images/story-sharing-friends.webp" alt="친구들과 여름 바다 여행 Drive Story 공유 시안" width="240"> |
 
 여행 사진과 이동 기록, 그날의 음악을 함께 담은 **Drive Story 공유 시안**입니다. 이미지 속 SNS 업로드와 경로·거리·시간 기록은 현재 앱 기능이 아닙니다.
 
@@ -45,6 +56,12 @@ CAR IN은 **자동차의 목적지와 사용자가 남긴 음악 기록을 연�
 ![전기차 충전 중 카인 마이크로 노래하는 콘셉트](docs/images/karaoke-microphone-concept.webp)
 
 차량을 충전하는 동안 호환 마이크, 에코 효과, 엠비언트 라이트와 함께 노래하는 **향후 확장 시안**입니다. 현재 MVP에는 마이크 입력·에코·조명 제어·MR·점수 기능이 없습니다.
+
+### 동승자 공동 선곡
+
+<img src="docs/images/together-concept.webp" alt="QR로 동승자가 함께 선곡하는 모바일 화면 시안" width="340">
+
+QR을 이용해 동승자의 휴대폰에서 함께 노래를 고르는 **CAR IN Together 시안**입니다. QR 연결과 휴대폰 연동은 향후 개발할 기능입니다.
 
 </details>
 
@@ -64,6 +81,14 @@ NaviHelper SDK 연결과 목적지 조회 호출은 확인했습니다. 다만 �
 
 Pleos Connect Emulator에서 등록·재생·사진 연결·앱 재실행 및 덮어 설치 후 데이터 유지, 손상 데이터 보호 상태, 직전 기록과 사진의 복원을 확인했습니다. **실제 차량의 목적지 데이터와 주행 중 기능 차단은 아직 검증하지 않았습니다.**
 
+### 최근 로컬 개발 완료 · 원격 반영 대기
+
+- **백그라운드 재생:** `CarinPlaybackService`가 플레이어를 소유하고 `MainActivity`는 `MediaController`로 연결합니다. 홈·내비게이션으로 전환해도 재생이 이어지고, 시스템 미디어 키와 앱 상태가 일치하는 것을 Pleos Connect Emulator에서 확인했습니다. 앱 연결만으로 자동 재생하지 않으며, 시스템의 재개 요청에서는 마지막 곡과 위치를 복원합니다.
+- **제출 APK:** 위 재생 구조를 포함한 Release APK를 빌드해 같은 서명으로 덮어 설치했습니다. 기존 추억과 사진 유지, 백그라운드 재생과 시스템 일시정지 키를 확인했습니다. 빌드 시 단위 테스트 18개와 Release lint가 통과했습니다. APK 크기는 약 **23.7 MB**입니다.
+- **추가 검증 필요:** Pleos 미디어 앱·홈 위젯 표시, 스티어링 휠 하드키·Tune Knob, 실제 차량의 오디오 포커스 영구 상실 경로는 확인되지 않았습니다. 앱의 미디어 세션 인식과 에뮬레이터 미디어 키 동작까지 검증한 상태입니다.
+
+위 두 커밋은 **이 GitHub `main`에 아직 없으므로**, 아래 소스 빌드만으로는 백그라운드 재생이나 제출 APK를 확인할 수 없습니다. 로컬 개발 커밋이 푸시되면 이 구분을 합칠 예정입니다.
+
 ## 3분 시연 흐름
 
 1. 앱을 실행하고 미니 플레이어에서 음악을 재생합니다.
@@ -76,7 +101,7 @@ Pleos Connect Emulator에서 등록·재생·사진 연결·앱 재실행 및 �
 
 ## 실행 및 빌드
 
-Pleos Connect 개발 환경과 SDK 저장소 설정을 마친 뒤 프로젝트 루트에서 실행합니다. **이 저장소에는 설치용 APK가 포함되어 있지 않습니다.**
+Pleos Connect 개발 환경과 SDK 저장소 설정을 마친 뒤 프로젝트 루트에서 실행합니다. **현재 원격 저장소에는 설치용 APK가 포함되어 있지 않습니다.** 제출 APK는 별도 로컬 개발 커밋에 있으며, 푸시 후 `apk/CARIN_CAR_IN_release.apk`에서 받을 수 있습니다.
 
 ```bash
 ./gradlew testDebugUnitTest
@@ -99,11 +124,14 @@ Windows PowerShell에서는 `./gradlew` 대신 `./gradlew.bat`을 사용하세�
 
 | 순서 | 계획 | 현재 상태 |
 | --- | --- | --- |
-| 1 | 백그라운드 재생과 앱 복귀 시 플레이어 상태 안정화 | 미구현 |
+| 1 | 기본 배경 이미지 4장을 실제 JPEG로 변환해 APK 크기 줄이기 | 진행 중 · 완료 검증 전 |
 | 2 | 실제 목적지 데이터·주행 제한 검증, 주행 상태 변화 대응 | 실차 검증 필요 |
 | 3 | 추억 삭제·기본 배경 전환 시 불필요한 사진 정리 | 미구현 |
-| 4 | Drive Story의 경로·시간 기록과 이미지 공유, 휴대폰 연동 | 향후 연동 예정 |
-| 5 | QR 공동 선곡, 마이크·에코·가사 동기화·MR, 엠비언트 라이트 | 파트너십·기기/SDK 호환성 확인 후 검토 |
+| 4 | Pleos 미디어 앱 표시와 차량 하드키 호환성 검증 | 미검증 |
+| 5 | Drive Story의 경로·시간 기록과 이미지 공유, 휴대폰 연동 | 향후 연동 예정 |
+| 6 | QR 공동 선곡, 마이크·에코·가사 동기화·MR, 엠비언트 라이트 | 파트너십·기기/SDK 호환성 확인 후 검토 |
+
+현재 앱의 기본 배경 파일은 `.jpg` 확장자를 사용하지만 **파일 내용은 PNG**입니다. 실제 JPEG 변환을 완료하고 용량·화질·빌드를 확인한 뒤 크기 절감 결과를 반영하겠습니다.
 
 공유 시안의 거리·시간·경로와 마이크·조명 연출은 **미래 경험을 설명하는 예시**이며 현재 앱에서 생성하거나 제어하는 데이터가 아닙니다. 음악 콘텐츠 이용 권리와 차량 시스템 호환성도 서비스 확대 단계에서 확인해야 합니다.
 
@@ -116,7 +144,8 @@ Windows PowerShell에서는 `./gradlew` 대신 `./gradlew.bat`을 사용하세�
 | `app/src/main/java/com/carin/noraebang/photo/` | 사진 크기·방향 보정과 JPEG 저장 |
 | `app/src/main/java/com/carin/noraebang/karaoke/` | 노래방 화면과 사진 선택 |
 | `app/src/main/java/com/carin/noraebang/navi/`, `safety/` | 목적지 조회와 주행 안전 확인 |
-| `app/src/main/assets/backgrounds/` | 앱에 포함된 기본 JPEG 배경 |
-| `docs/images/` | README용 디자인·확장 콘셉트 시안 |
+| `app/src/main/assets/backgrounds/` | 앱에 포함된 기본 배경 (`.jpg` 이름의 PNG 데이터, 변환 예정) |
+| `app/src/main/java/com/carin/noraebang/playback/` | 별도 로컬 커밋에서 추가한 재생 서비스·플레이리스트 (원격 푸시 전) |
+| `docs/images/` | 팀 제공 이미지로 구성한 로고·디자인·확장 콘셉트 시안 |
 
 기획과 구현을 더 자세히 보려면 [기능 현황](docs/feature-status.md), [구현 요약](docs/implementation-summary.md), [초기 감사 기록](docs/mvp-audit.md)을 참고하세요. 이미지 시안과 실제 구현은 위의 **현재 동작하는 MVP** 및 소스 코드를 기준으로 구분해 주세요.
