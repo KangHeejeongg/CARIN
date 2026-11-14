@@ -1,0 +1,23 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# release 서명 정보 (절대 커밋 금지)
+keystore.properties
+*.jks
+*.keystore
+
+# Android Studio 로컬 실행 대상 (PC 사용자 경로 포함)
+/.idea/deploymentTargetSelector.xml

@@ -1,0 +1,15 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- CAR IN 다크 로즈 테마. 화면은 코드로 그리므로 액션바 없이 브랜드 배경만 지정한다. -->
+    <style name="Theme.CARIN" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="colorPrimary">@color/carin_coral</item>
+        <item name="colorPrimaryVariant">@color/carin_deep_vinyl</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/carin_light_rose</item>
+        <item name="colorSecondaryVariant">@color/carin_coral</item>
+        <item name="colorOnSecondary">@color/carin_deep_vinyl</item>
+        <item name="android:windowBackground">@color/carin_deep_vinyl</item>
+        <item name="android:statusBarColor">@color/carin_deep_vinyl</item>
+        <item name="android:navigationBarColor">@color/carin_deep_vinyl</item>
+        <item name="android:colorAccent">@color/carin_coral</item>
+    </style>
+</resources>

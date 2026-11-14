@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CAR IN 브랜드 팔레트 (ui/CarinTheme와 동일) -->
+    <color name="carin_deep_vinyl">#FF1A191E</color>
+    <color name="carin_charcoal">#FF2B2B31</color>
+    <color name="carin_glass_white">#FFFAF8F9</color>
+    <color name="carin_light_rose">#FFFFAEB5</color>
+    <color name="carin_coral">#FFFF7F88</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>
