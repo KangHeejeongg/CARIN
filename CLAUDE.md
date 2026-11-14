@@ -36,7 +36,8 @@ adb logcat -s CARIN_NAVI CARIN_VEHICLE CARIN_SAFETY CARIN_MEMORY AndroidRuntime:
 ```
 
 - Pleos 에뮬레이터는 **user build**라 `cmd car_service inject-vhal-event`가 막혀 있고, 기어/속도는 벤더 속성이라 표준 `CarUxRestrictions`를 "주행 중"으로 바꿀 수 없다. 주행 제한 경로는 에뮬레이터에서 재현 불가.
-- 앱은 운전자 사용자(user 10)로 실행되므로 `run-as`로 데이터 디렉터리가 보이지 않는다. 영속성은 force-stop 후 재실행으로 확인한다.
+- 앱은 운전자 사용자(user 10)로 실행된다. release 빌드는 데이터 디렉터리를 볼 수 없어 영속성을 force-stop 후 재실행으로 확인하고, **debug 빌드는 `adb shell run-as com.carin.noraebang --user 10 ls files/photos`처럼 `--user 10`을 붙이면 파일·prefs를 직접 확인할 수 있다**.
+- debug 빌드 전용 실패 주입: `adb shell am start --user 10 -n com.carin.noraebang/.MainActivity --ez carin_debug_fail_photo_save true` (사진 연결 저장 실패), `--ez carin_debug_fail_photo_write true` (JPEG 쓰기 실패). release는 디버그 가능 플래그가 없어 무시된다.
 - 에뮬레이터를 Bash 백그라운드로 띄우면 셸 종료 시 함께 죽는다. PowerShell `Start-Process`로 띄울 것.
 - debug와 release는 서명이 다르므로 전환 설치 시 `adb uninstall com.carin.noraebang` 먼저.
 
@@ -65,7 +66,10 @@ MainActivity (메뉴 + 플레이어 + Memory Route + 노래방 오버레이 오�
  ├─ karaoke/
  │   ├─ KaraokePanel      노래방 전체 화면 뷰. 재생 제어는 Listener로 MainActivity에 위임
  │   ├─ DemoLyrics        팀 자체 제작 정적 데모 가사 (실제 가사 아님, 동기화 없음)
- │   └─ PhotoPicker       동작하는 사진 선택 인텐트 탐색(AAOS 스텁 제외) + 앱 내부 축소 복사
+ │   └─ PhotoPicker       동작하는 사진 선택 인텐트 탐색(AAOS 스텁 제외)
+ ├─ photo/
+ │   ├─ PhotoImporter     새 사진: 크기 확인 → 축소(긴 변 1600) → EXIF 방향 보정 → 임시 파일에 JPEG → 이름 변경. 앱 소유 파일만 삭제
+ │   └─ PhotoSizing       축소 크기 계산 (JVM 테스트: PhotoSizingTest)
  ├─ ui/                 디자인 시스템 (목업: Downloads/CARIN/목업, 브랜드 팔레트 시안)
  │   ├─ CarinTheme        팔레트 토큰(Deep Vinyl·Charcoal·Glass White·Light Rose·Coral)·뷰 팩토리. 색은 여기서만 정의
  │   ├─ CarinIcon         코드로 그리는 라인 아이콘 (이모지 대신)
@@ -84,7 +88,7 @@ MainActivity (메뉴 + 플레이어 + Memory Route + 노래방 오버레이 오�
 - **추억 제안 중복 방지.** 추억 발견 시 팝업 대신 히어로 카드가 "지난번 이 길에서 들었던 노래가 있어요"로 바뀐다. `applyDestination()`은 `source|normalize(name)|normalize(address)` 키를 `lastPromptedKey`와 비교해 같은 목적지에는 탭 전환·강조를 한 번만 한다. 히어로는 항상 다시 그린다.
 - **매칭은 substring이 아니라 토큰 완전 일치.** `PlaceMatcher`는 공백/쉼표로 토큰을 나누고 행정 접미사(시·군·구·역·광역시…)를 떼어 비교한다. "강릉" ↔ "강릉역"/"강원특별자치도 강릉시 …"는 일치, "산" ↔ "부산"은 불일치. 규칙을 바꾸면 `PlaceMatcherTest`를 함께 수정한다.
 - **저장 원문을 덮어쓰지 않는다.** `MemoryStore`의 모든 쓰기는 `write()`를 거친다: 배열 전체 손상이면 차단(`isWriteProtected()`), 일부 손상 레코드는 원문 그대로 다시 저장. 새 쓰기 메서드를 만들 때 `saveAll` 같은 직접 덮어쓰기를 추가하지 말 것.
-- **사진은 항상 앱 내부 복사본.** AAOS에서 `OPEN_DOCUMENT/GET_CONTENT`는 `com.android.car.frameworkpackagestubs` 스텁("파일 관리 미지원")으로 가고, 포토 피커(`android.provider.action.PICK_IMAGES`) URI는 영구 권한이 없다. 그래서 `PhotoPicker.importToAppStorage()`로 `files/photos/*.jpg`에 복사한 `file://` URI만 저장한다. 노래방 배경은 prefs `carin_karaoke`, 추억 사진은 `Memory.photoUri`.
+- **사진은 항상 앱 내부 복사본.** AAOS에서 `OPEN_DOCUMENT/GET_CONTENT`는 `com.android.car.frameworkpackagestubs` 스텁("파일 관리 미지원")으로 가고, 포토 피커(`android.provider.action.PICK_IMAGES`) URI는 영구 권한이 없다. 그래서 `PhotoImporter.importAsync()`로 `files/photos/<uuid>.jpg`에 만든 `file://` URI만 저장한다. 노래방 배경은 prefs `carin_karaoke`, 추억 사진은 `Memory.photoUri`. 변환이나 저장(추억 `update`, 노래방 prefs `commit`)이 실패하면 새 파일을 지우고 기존 연결을 유지한다. 저장에 성공했을 때만, 어떤 추억 원문(`MemoryStore.isPhotoReferenced`)이나 노래방 설정도 참조하지 않는 이전 파일을 지운다. 기존 사진 일괄 변환·고아 파일 일괄 정리는 아직 없다.
 - **주행 안전.** 텍스트 입력·기록 삭제·노래방 진입·사진 선택 전에 `DrivingSafetyGuard.check()`를 호출하고 `PARKED`일 때만 진행한다. 노래방이 열린 채 `onResume`되면 다시 확인한다. `UNKNOWN`(차량 서비스 접근 불가)도 제한으로 취급한다. 속도 0만으로 주차라고 판단하지 않는다. 음악 재생은 제한하지 않는다. Vehicle SDK의 `Gear` API는 `@hide/@Deprecated`라 쓰지 않는다.
 - **SDK 콜백은 백그라운드 스레드로 온다.** `NaviDestinationClient`가 `Handler(Looper.getMainLooper())`로 올린 뒤 콜백한다. Vehicle SDK 좌석 조회도 `runOnUiThread`로 감싼다. 둘 다 `onDestroy`에서 `release()`.
 - NaviHelper 조회 권한 `pleos.car.permission.NAVI_ROUTE`(normal)은 main 매니페스트에 있다. `app/src/debug/`의 `NaviProbeActivity`는 SDK 진단용 debug 전용 화면이며 release에 포함되지 않는다.

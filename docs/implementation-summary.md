@@ -18,7 +18,8 @@
 | `memory/MemoryRegisterDialog.java` | 등록 다이얼로그 (곡은 알약 탭으로 선택) | MVP + 리디자인 |
 | `karaoke/KaraokePanel.java` | 노래방 전체 화면 오버레이: 현재 줄 강조 가사, 진행 바, 원형 컨트롤 | CAR IN + 리디자인 |
 | `karaoke/DemoLyrics.java` | 팀 자체 제작 정적 데모 가사 (`linesFor()`로 줄 단위 제공) | CAR IN |
-| `karaoke/PhotoPicker.java` | 동작하는 사진 선택기 탐색 + 앱 내부 복사 | CAR IN |
+| `karaoke/PhotoPicker.java` | 동작하는 사진 선택기 탐색 | CAR IN |
+| `photo/PhotoImporter.java`, `photo/PhotoSizing.java` | 새 사진 크기 확인·축소·EXIF 방향 보정·JPEG 임시 저장 후 이름 변경, 앱 소유 파일 삭제 | 사진 관리 |
 | `ui/CarinTheme.java` | 브랜드 팔레트 토큰과 뷰 팩토리(텍스트·유리 카드·칩·글로우·노을 그라디언트). **색은 여기서만 정의** | 리디자인 |
 | `ui/CarinIcon.java` | 코드로 그리는 라인 아이콘 17종 (재생·마이크·핀·달력 등) | 리디자인 |
 | `ui/PillButton.java` / `ui/CircleButton.java` | 알약 버튼(주·보조·탭) / 원형 버튼(코랄 재생·유리·투명) | 리디자인 |
@@ -133,10 +134,27 @@ FrameLayout (앱 배경: Deep Vinyl + 상단 코랄 빛)
 
 ## 7. 사진 처리
 
-- 선택기: `PhotoPicker.buildIntent()`가 `PICK_IMAGES`(API 33+) → `GET_CONTENT` → `OPEN_DOCUMENT` → `PICK` 순으로 조회하고, AAOS의 `com.android.car.frameworkpackagestubs`("파일 관리 미지원" 스텁)는 제외한다. Pleos 에뮬레이터에서는 시스템 포토 피커(`com.android.providers.media.module`)가 선택된다.
-- 저장: 포토 피커 URI는 영구 권한이 없으므로 `importToAppStorage()`가 최대 1600px로 축소해 `files/photos/<uuid>.jpg`로 복사하고 `file://` URI를 보관한다. 노래방 배경은 prefs `carin_karaoke.background_uri`, 추억 사진은 `Memory.photoUri`.
-- 표시: `ImageLoader`가 백그라운드 스레드에서 축소 디코딩하고, 같은 뷰에 더 최근 요청이 있으면 이전 결과를 버린다(뷰 tag 비교).
-- 실패 처리: 디코딩 실패 → 토스트 + 기본 배경. 상세 화면에서 파일이 없으면 "사진을 열 수 없어요" 안내.
+```
+[추억 상세 > 사진 연결] onPickPhoto: 주차 확인 → 저장소 보호 확인 → startPhotoPicker(REQ_PICK_MEMORY_PHOTO)
+[노래방 > 사진 선택]   onPickPhoto: 주차 확인 → startPhotoPicker(REQ_PICK_KARAOKE_PHOTO)
+        ↓ PhotoPicker.buildIntent(): PICK_IMAGES → GET_CONTENT → OPEN_DOCUMENT → PICK (AAOS 스텁 제외)
+onActivityResult: (추억이면 보호 상태 재확인) → PhotoImporter.importAsync (백그라운드)
+   1) bounds 디코딩: 이미지 아님 → INVALID_IMAGE, 100MP 초과 → TOO_LARGE
+   2) EXIF Orientation 읽기 (android.media.ExifInterface, 새 의존성 없음)
+   3) inSampleSize(긴 변 ≥ 1600 유지) 디코딩 → Matrix로 긴 변 1600 + 회전·반전
+   4) files/photos/.tmp_<uuid>.jpg 에 JPEG 85 → fsync → <uuid>.jpg 로 이름 변경 (실패 시 임시 파일 삭제)
+        ↓ 메인 스레드
+   실패 → 안내 토스트, 기존 연결 유지
+   추억: applyMemoryPhoto → MemoryStore.update(withPhoto)
+         실패(보호 상태/대상 없음/저장 실패) → 새 파일 삭제, 기존 연결 유지
+         성공 → releaseReplacedPhoto(이전 URI): 앱 소유 + 추억 원문·노래방 설정 어디에도 없을 때만 삭제
+   노래방: applyKaraokePhoto → prefs commit → 실패 시 새 파일 삭제 / 성공 시 이전 파일 정리
+```
+
+- Activity가 가져오는 도중 종료되면 새 파일을 지운다.
+- 표시: `ImageLoader`가 백그라운드에서 축소 디코딩하고, 같은 뷰에 더 최근 요청이 있으면 이전 결과를 버린다.
+- 범위 밖(후속): 기존 사진의 일괄 변환, 추억 삭제·노래방 "기본 배경" 시 파일 정리, 고아 파일 일괄 정리.
+- 검증: `PhotoSizingTest`(축소 크기), 에뮬레이터에서 큰 사진·회전 사진·잘못된 이미지·같은 사진 재연결·재실행·덮어 설치, debug 실패 주입(저장 실패·JPEG 쓰기 실패)과 `run-as --user 10`으로 파일 목록 확인.
 
 ## 8. SDK / 플랫폼 API (소스 jar에서 확인한 것만 사용)
 

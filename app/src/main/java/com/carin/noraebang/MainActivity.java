@@ -3,6 +3,7 @@ package com.carin.noraebang;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -43,6 +44,7 @@ import com.carin.noraebang.memory.MemoryStore;
 import com.carin.noraebang.memory.PlaceMatcher;
 import com.carin.noraebang.memory.SongCatalog;
 import com.carin.noraebang.navi.NaviDestinationClient;
+import com.carin.noraebang.photo.PhotoImporter;
 import com.carin.noraebang.safety.DrivingSafetyGuard;
 import com.carin.noraebang.ui.CarinDialog;
 import com.carin.noraebang.ui.CarinIcon;
@@ -166,6 +168,8 @@ public class MainActivity extends Activity {
     private CarinDialog detailDialog;
     /** 추억 상세에서 사진 선택을 시작했을 때 결과를 연결할 추억 ID */
     private String pendingPhotoMemoryId = null;
+    /** debug 빌드 검증용: true면 사진 연결 저장을 실패로 처리한다 (release는 설정 경로 없음) */
+    private static boolean debugFailPhotoSave = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -173,6 +177,7 @@ public class MainActivity extends Activity {
 
         memoryStore = new MemoryStore(this);
         safetyGuard = new DrivingSafetyGuard(this);
+        readDebugFaults(getIntent());
 
         getWindow().setStatusBarColor(CarinTheme.DEEP_VINYL);
         getWindow().setNavigationBarColor(CarinTheme.DEEP_VINYL);
@@ -1368,54 +1373,131 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        readDebugFaults(intent);
+    }
+
+    /**
+     * debug 빌드에서만 실패 주입 플래그를 읽는다. 예)
+     * adb shell am start -n com.carin.noraebang/.MainActivity --ez carin_debug_fail_photo_save true
+     * adb shell am start -n com.carin.noraebang/.MainActivity --ez carin_debug_fail_photo_write true
+     */
+    private void readDebugFaults(Intent intent) {
+        if (intent == null || (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) return;
+        if (!intent.hasExtra("carin_debug_fail_photo_save")
+                && !intent.hasExtra("carin_debug_fail_photo_write")) return;
+        if (intent.hasExtra("carin_debug_fail_photo_save")) {
+            debugFailPhotoSave = intent.getBooleanExtra("carin_debug_fail_photo_save", false);
+        }
+        if (intent.hasExtra("carin_debug_fail_photo_write")) {
+            PhotoImporter.debugFailWrite = intent.getBooleanExtra("carin_debug_fail_photo_write", false);
+        }
+        Log.w("CARIN_PHOTO", "debug 실패 주입: save=" + debugFailPhotoSave
+                + " write=" + PhotoImporter.debugFailWrite);
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != REQ_PICK_KARAOKE_PHOTO && requestCode != REQ_PICK_MEMORY_PHOTO) return;
 
         Uri picked = (resultCode == RESULT_OK && data != null) ? data.getData() : null;
         Log.d("CARIN_PHOTO", "선택 결과 resultCode=" + resultCode + " uri=" + picked);
-        if (picked == null) {
-            pendingPhotoMemoryId = null;
-            return;
-        }
-
-        // 선택기 URI는 세션이 끝나면 접근이 막힐 수 있으므로 앱 내부 복사본을 사용한다
-        Uri uri = PhotoPicker.importToAppStorage(this, picked);
-        if (uri == null) {
-            pendingPhotoMemoryId = null;
-            Toast.makeText(this, "사진을 불러올 수 없어 기본 배경을 사용합니다.", Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        if (requestCode == REQ_PICK_KARAOKE_PHOTO) {
-            // 노래방에서 직접 고른 사진은 이번 세션에서 추억 사진보다 우선해 바로 보여준다
-            saveKaraokePhoto(uri);
-            karaokeSessionMemory = null;
-            karaokePanel.setBackgroundPhoto(uri, "내 사진");
-            return;
-        }
-
-        Memory target = memoryStore.findById(pendingPhotoMemoryId);
+        final String memoryId = pendingPhotoMemoryId;
         pendingPhotoMemoryId = null;
-        if (target == null) {
-            Toast.makeText(this, "사진을 연결할 추억을 찾을 수 없습니다.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        Memory updated = target.withPhoto(uri.toString());
-        if (memoryStore.update(updated)) {
-            Toast.makeText(this, "'" + target.title + "'에 사진을 연결했습니다.", Toast.LENGTH_SHORT).show();
-            refreshMemoryViews();
-            showMemoryDetail(updated);
-        } else if (!showIfWriteProtected()) {
-            Toast.makeText(this, "사진 연결에 실패했습니다.", Toast.LENGTH_SHORT).show();
-        }
+        if (picked == null) return;
+
+        // 선택기에 있는 동안 저장소가 보호 상태가 됐을 수 있으므로 가져오기(파일 생성) 전에 다시 확인
+        if (requestCode == REQ_PICK_MEMORY_PHOTO && showIfWriteProtected()) return;
+
+        // 선택기 URI는 세션이 끝나면 접근이 막힐 수 있으므로 축소·방향 보정한 앱 내부 JPEG 사본을 쓴다.
+        // 큰 사진의 디코딩이 화면을 멈추지 않도록 백그라운드에서 처리한다.
+        Toast.makeText(this, "사진을 준비하는 중이에요…", Toast.LENGTH_SHORT).show();
+        PhotoImporter.importAsync(this, picked, result -> {
+            if (activityDestroyed) {
+                // 결과를 저장할 화면이 없으므로 새 파일만 정리 (기존 연결은 그대로)
+                if (result.ok()) PhotoImporter.deleteOwnedPhoto(this, result.uri.toString());
+                return;
+            }
+            if (!result.ok()) {
+                // 변환 실패: 기존 사진 연결을 그대로 두고 이유만 안내 (임시 파일은 PhotoImporter가 정리)
+                Toast.makeText(this, result.message(), Toast.LENGTH_LONG).show();
+                return;
+            }
+            if (requestCode == REQ_PICK_KARAOKE_PHOTO) {
+                applyKaraokePhoto(result.uri);
+            } else {
+                applyMemoryPhoto(memoryId, result.uri);
+            }
+        });
     }
 
-    private void saveKaraokePhoto(Uri uri) {
+    /**
+     * 가져온 새 사진을 추억에 연결한다. 저장에 실패하면 새 파일을 지우고 기존 연결을 유지한다.
+     * 성공하면 더 이상 참조되지 않는 이전 사진 파일만 지운다.
+     */
+    private void applyMemoryPhoto(String memoryId, Uri newPhoto) {
+        String newUri = newPhoto.toString();
+        Memory target = memoryStore.findById(memoryId);
+        Memory updated = target == null ? null : target.withPhoto(newUri);
+        boolean saved = updated != null
+                && !memoryStore.isWriteProtected()
+                && !debugFailPhotoSave
+                && memoryStore.update(updated);
+
+        if (!saved) {
+            PhotoImporter.deleteOwnedPhoto(this, newUri);
+            if (debugFailPhotoSave) Log.w("CARIN_PHOTO", "debug 실패 주입: 추억 저장 실패로 처리");
+            if (target == null) {
+                Toast.makeText(this, "사진을 연결할 추억을 찾을 수 없습니다.", Toast.LENGTH_SHORT).show();
+            } else if (!showIfWriteProtected()) {
+                Toast.makeText(this, "사진 연결에 실패했어요. 기존 사진은 그대로 유지됩니다.",
+                        Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+
+        releaseReplacedPhoto(target.photoUri, newUri);
+        Toast.makeText(this, "'" + target.title + "'에 사진을 연결했습니다.", Toast.LENGTH_SHORT).show();
+        refreshMemoryViews();
+        showMemoryDetail(updated);
+    }
+
+    /** 노래방에서 고른 새 사진을 저장한다. 실패하면 새 파일을 지우고 기존 배경을 유지한다 */
+    private void applyKaraokePhoto(Uri newPhoto) {
+        String newUri = newPhoto.toString();
+        Uri previous = loadKaraokePhoto();
+        if (debugFailPhotoSave || !saveKaraokePhoto(newPhoto)) {
+            PhotoImporter.deleteOwnedPhoto(this, newUri);
+            Toast.makeText(this, "노래방 배경을 저장하지 못했어요. 기존 배경은 그대로 유지됩니다.",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        releaseReplacedPhoto(previous == null ? null : previous.toString(), newUri);
+        // 노래방에서 직접 고른 사진은 이번 세션에서 추억 사진보다 우선해 바로 보여준다
+        karaokeSessionMemory = null;
+        karaokePanel.setBackgroundPhoto(newPhoto, "내 사진");
+    }
+
+    /**
+     * 교체되어 빠진 이전 사진 파일을 지운다.
+     * 앱이 만든 파일이고, 어떤 추억(읽지 못한 레코드 포함)이나 노래방 설정도 참조하지 않을 때만 삭제한다.
+     */
+    private void releaseReplacedPhoto(String oldUri, String newUri) {
+        if (oldUri == null || oldUri.equals(newUri)) return;
+        if (memoryStore.isPhotoReferenced(oldUri)) return;
+        Uri karaoke = loadKaraokePhoto();
+        if (karaoke != null && oldUri.equals(karaoke.toString())) return;
+        PhotoImporter.deleteOwnedPhoto(this, oldUri);
+    }
+
+    /** 노래방 배경 사진 설정을 동기 저장한다. 저장 성공 시 true */
+    private boolean saveKaraokePhoto(Uri uri) {
         SharedPreferences.Editor editor = getSharedPreferences(PREFS_KARAOKE, MODE_PRIVATE).edit();
         if (uri == null) editor.remove(KEY_KARAOKE_PHOTO);
         else editor.putString(KEY_KARAOKE_PHOTO, uri.toString());
-        editor.apply();
+        return editor.commit();
     }
 
     private Uri loadKaraokePhoto() {

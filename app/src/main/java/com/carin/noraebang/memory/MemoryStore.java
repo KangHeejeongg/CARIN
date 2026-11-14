@@ -76,6 +76,18 @@ public final class MemoryStore {
         return load().unreadable.size();
     }
 
+    /**
+     * 저장 원문(읽지 못한 레코드 포함)이 이 사진 파일을 참조하는지.
+     * 교체된 이전 사진을 지워도 되는지 판단할 때 쓴다. JSON의 '/' 이스케이프와 무관하도록 파일 이름으로 비교한다.
+     */
+    public boolean isPhotoReferenced(String photoUri) {
+        if (photoUri == null || photoUri.isEmpty()) return false;
+        String raw = prefs.getString(KEY_MEMORIES, null);
+        if (raw == null) return false;
+        String name = photoUri.substring(photoUri.lastIndexOf('/') + 1);
+        return !name.isEmpty() && raw.contains(name);
+    }
+
     /** 새 추억 저장. 저장 성공 시 true (쓰기 보호 상태면 false) */
     public boolean add(Memory memory) {
         return write(list -> list.add(memory));
