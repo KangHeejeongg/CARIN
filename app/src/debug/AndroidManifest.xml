@@ -5,5 +5,7 @@
     <application>
         <!-- Debug build only, started manually via adb. Not shipped in release. -->
         <activity android:name=".NaviProbeActivity" android:exported="true" />
+        <!-- Debug build only: MediaBrowserService-protocol browse/playback probe for CarinPlaybackService. -->
+        <activity android:name=".MediaBrowseProbeActivity" android:exported="true" />
     </application>
 </manifest>

@@ -54,7 +54,7 @@ release의 R8 `optimization { packageScope = ... }`는 Pleos 에뮬레이터에�
 ```
 MainActivity (메뉴 + 플레이어 + Memory Route + 노래방 오버레이 오케스트레이션)
  ├─ FrameLayout { LinearLayout(헤더·탭·페이지·미니 플레이어), KaraokePanel(GONE) }
- ├─ ExoPlayer (Media3 1.11.1)   onStart에서 생성, onStop에서 release
+ ├─ MediaController (Media3 1.11.1)   onStart에서 서비스에 연결, onStop에서 연결만 해제 (재생은 계속)
  ├─ memory/
  │   ├─ SongCatalog       번들 음원(res/raw) ↔ 고정 문자열 ID ↔ 제목. 플레이리스트의 단일 출처
  │   ├─ Memory            추억 1건 (id, place, title, travelDate, songId, createdAt, demo, photoUri?)
@@ -77,13 +77,18 @@ MainActivity (메뉴 + 플레이어 + Memory Route + 노래방 오버레이 오�
  │   ├─ PillButton / CircleButton / ProgressLine / LogoView / RouteLineView(장식용, 실제 GPS 경로 아님)
  │   ├─ CarinDialog       시스템 AlertDialog 대신 쓰는 다크 로즈 다이얼로그
  │   └─ ImageLoader       사진 비동기 로딩. 사용자 사진 → assets/backgrounds/{hero|karaoke|memory}.* → default.* → 노을 그라디언트
+ ├─ playback/
+ │   ├─ CarinPlaybackService  MediaLibraryService. ExoPlayer를 하나만 소유. 포커스·출력 분리·종료·작업 제거·재개 요청 처리
+ │   └─ CarinPlaylist         탐색 구조(root → 카인 플레이리스트 → 곡)와 곡 MediaItem·메타데이터
  ├─ navi/NaviDestinationClient   NaviHelper SDK 래퍼 (연결, getDestinationInfo, 콜백을 메인 스레드로)
  └─ safety/DrivingSafetyGuard     android.car.CarUxRestrictionsManager를 리플렉션으로 조회
 ```
 
 핵심 흐름과 불변 조건:
 
-- **곡 식별은 `SongCatalog.Song.id`(예: `carin_song_01`)로만 한다.** raw 리소스 번호는 빌드마다 바뀔 수 있어 저장하지 않는다. `MainActivity.createSong()`이 `MediaItem.setMediaId(song.id)`를 넣고, `playMemorySong()`은 플레이리스트에서 `mediaId`가 같은 인덱스를 찾아 `player.seekTo(index, 0); player.play()`를 호출한다. 새 재생 경로를 만들지 말고 이 플레이어를 재사용한다.
+- **곡 식별은 `SongCatalog.Song.id`(예: `carin_song_01`)로만 한다.** raw 리소스 번호는 빌드마다 바뀔 수 있어 저장하지 않는다. `CarinPlaylist.songs()`가 `MediaItem.setMediaId(song.id)`를 넣고, `playMemorySong()`은 플레이리스트에서 `mediaId`가 같은 인덱스를 찾아 `playAt(index)`(IDLE이면 prepare → seekTo → play)를 호출한다. 새 플레이어를 만들지 말고 `CarinPlaybackService`의 플레이어를 `MediaController`로 제어한다.
+- **재생 서비스 규칙 (Pleos Music/Audio 가이드).** 서비스 인텐트 필터에 `androidx.media3.session.MediaLibraryService`와 `android.media.browse.MediaBrowserService`를 함께 둔다. 앱 연결·서비스 생성만으로는 재생하지 않는다(playWhenReady=false). 재생은 명시적 동작이나 시스템 재개 요청(`onPlaybackResumption`, `MediaButtonReceiver`)에서만. 차량에서 곡 하나를 골라도 `onSetMediaItems`가 전체 플레이리스트를 유지한다. 포커스 일시 상실은 Media3가 일시정지·재개, 영구 상실은 정지. `onTaskRemoved`에서 정지 후 `stopSelf`.
+- debug 전용 `MediaBrowseProbeActivity`: `adb shell am start --user 10 -n com.carin.noraebang/.MediaBrowseProbeActivity` 후 `logcat -s CARIN_BROWSE_PROBE`로 MBS 방식 탐색·`playFromMediaId`를 점검한다.
 - **목적지 출처를 구분한다.** `DestinationSource { NONE, SDK, DEMO }`. SDK 목적지(NaviHelper)가 비어 있지 않으면 데모 목적지보다 우선한다. UI 문구에도 `(SDK)` / `[DEMO]`를 항상 표기해 실제 연동과 데모를 혼동시키지 않는다.
 - **메인 화면 구조.** 헤더(주행 상태 칩·로고·목적지 칩) → 탭 3개 → 페이지(플레이리스트: 히어로 카드 + 곡 목록 + Memory Route 패널 / 추억: `MemoryListPage`) → 하단 미니 플레이어. 노래방 탭은 오버레이를 연다.
 - **추억 제안 중복 방지.** 추억 발견 시 팝업 대신 히어로 카드가 "지난번 이 길에서 들었던 노래가 있어요"로 바뀐다. `applyDestination()`은 `source|normalize(name)|normalize(address)` 키를 `lastPromptedKey`와 비교해 같은 목적지에는 탭 전환·강조를 한 번만 한다. 히어로는 항상 다시 그린다.

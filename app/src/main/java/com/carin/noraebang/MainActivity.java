@@ -1,6 +1,7 @@
 package com.carin.noraebang;
 
 import android.app.Activity;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
@@ -20,10 +21,11 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.media3.common.MediaItem;
-import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.Player;
 import androidx.media3.common.PlaybackException;
-import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.session.MediaController;
+import androidx.media3.session.SessionToken;
+import com.google.common.util.concurrent.ListenableFuture;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -47,6 +49,7 @@ import com.carin.noraebang.memory.PlaceMatcher;
 import com.carin.noraebang.memory.SongCatalog;
 import com.carin.noraebang.navi.NaviDestinationClient;
 import com.carin.noraebang.photo.PhotoImporter;
+import com.carin.noraebang.playback.CarinPlaybackService;
 import com.carin.noraebang.safety.DrivingSafetyGuard;
 import com.carin.noraebang.ui.CarinDialog;
 import com.carin.noraebang.ui.CarinIcon;
@@ -73,7 +76,9 @@ public class MainActivity extends Activity {
     private static final int TAB_KARAOKE = 1;
     private static final int TAB_MEMORY = 2;
 
-    private ExoPlayer player;
+    /** 재생 서비스의 플레이어를 제어하는 MediaController (연결 전·onStop 후에는 null) */
+    private Player player;
+    private ListenableFuture<MediaController> controllerFuture;
 
     // Vehicle SDK 연결 및 좌석 상태 조회에 사용하는 객체
     private Vehicle vehicle;
@@ -180,6 +185,13 @@ public class MainActivity extends Activity {
         memoryStore = new MemoryStore(this);
         safetyGuard = new DrivingSafetyGuard(this);
         readDebugFaults(getIntent());
+        // Pleos 가이드: 서비스를 Started 상태로 두어 앱 작업 제거 시 onTaskRemoved에서 재생을 정리하게 한다.
+        // 서비스 생성만으로는 재생하지 않는다.
+        try {
+            startService(new Intent(this, CarinPlaybackService.class));
+        } catch (Exception e) {
+            Log.w("CARIN_PLAYBACK", "재생 서비스 시작 실패 (연결 시 다시 생성됨)", e);
+        }
 
         getWindow().setStatusBarColor(CarinTheme.DEEP_VINYL);
         getWindow().setNavigationBarColor(CarinTheme.DEEP_VINYL);
@@ -684,7 +696,8 @@ public class MainActivity extends Activity {
     }
 
     // ───────────────────────────────────────────
-    // 플레이어 (기존 ExoPlayer, onStart 생성 / onStop 해제)
+    // 플레이어: CarinPlaybackService가 ExoPlayer를 소유하고, 화면은 MediaController로 제어한다.
+    // onStart에서 연결, onStop에서 연결만 해제하므로 다른 앱으로 전환해도 재생이 계속된다.
     // ───────────────────────────────────────────
 
     /** 재생 컨트롤 버튼 이벤트 연결 */
@@ -694,13 +707,17 @@ public class MainActivity extends Activity {
         nextButton.setOnClickListener(v -> skipNext());
     }
 
-    /** 재생 / 일시정지 */
+    /** 재생 / 일시정지 (명시적 사용자 동작) */
     private void togglePlay() {
         if (player == null) return;
 
         if (player.isPlaying()) {
             player.pause();
         } else {
+            // 포커스 영구 상실로 정지(IDLE)됐거나 끝까지 재생(ENDED)한 경우도 이어서 재생할 수 있게 준비
+            if (player.getPlaybackState() == Player.STATE_IDLE) {
+                player.prepare();
+            }
             if (player.getPlaybackState() == Player.STATE_ENDED) {
                 player.seekTo(0, 0);
             }
@@ -719,6 +736,14 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** 플레이리스트의 index번째 곡을 처음부터 재생 (명시적 사용자 동작) */
+    private void playAt(int index) {
+        if (player == null) return;
+        if (player.getPlaybackState() == Player.STATE_IDLE) player.prepare();
+        player.seekTo(index, 0);
+        player.play();
+    }
+
     /** 다음 곡 */
     private void skipNext() {
         if (player != null && player.hasNextMediaItem()) {
@@ -726,92 +751,72 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** 음악 파일을 플레이리스트 항목으로 변환 */
-    private MediaItem createSong(SongCatalog.Song song) {
+    /** 서비스 플레이어 상태 변화를 화면(미니 플레이어·곡 목록·노래방)에 반영 */
+    private final Player.Listener playerListener = new Player.Listener() {
 
-        Uri uri = Uri.parse(
-                "android.resource://"
-                        + getPackageName()
-                        + "/" + song.rawResId
-        );
+        @Override
+        public void onMediaItemTransition(MediaItem mediaItem, int reason) {
+            updateSongInfo();
+        }
 
-        return new MediaItem.Builder()
-                .setUri(uri)
-                // 추억 기록이 참조하는 고정 ID. 재생 시 이 값으로 곡을 찾는다.
-                .setMediaId(song.id)
-                .setMediaMetadata(
-                        new MediaMetadata.Builder()
-                                .setTitle(song.title)
-                                .build()
-                )
-                .build();
+        @Override
+        public void onIsPlayingChanged(boolean isPlaying) {
+            showPlayingState(isPlaying);
+        }
+
+        @Override
+        public void onPlaybackStateChanged(int state) {
+            if (state == Player.STATE_ENDED) {
+                statusText.setText("재생 완료");
+            }
+        }
+
+        @Override
+        public void onPlayerError(PlaybackException error) {
+            statusText.setText("재생 오류: " + error.getErrorCodeName());
+            CarinTheme.styleChip(statusText, WARN);
+        }
+    };
+
+    /** 재생 버튼 아이콘·상태 칩·노래방 버튼을 같은 상태로 맞춘다 */
+    private void showPlayingState(boolean isPlaying) {
+        playButton.setIcon(isPlaying ? CarinIcon.Type.PAUSE : CarinIcon.Type.PLAY);
+        statusText.setText(isPlaying ? "♪ 재생 중" : "일시정지");
+        CarinTheme.styleChip(statusText, CarinTheme.LIGHT_ROSE);
+        // 노래방 화면의 재생 버튼도 같은 플레이어 상태를 따른다
+        karaokePanel.setPlaying(isPlaying);
     }
 
     @Override
     protected void onStart() {
         super.onStart();
+        connectPlayer();
+        uiHandler.post(progressTicker);
+    }
 
-        player = new ExoPlayer.Builder(this).build();
-
-        List<MediaItem> playlist = new ArrayList<>();
-
-        // 실제 보유한 음원 목록은 SongCatalog에서 관리
-        for (SongCatalog.Song song : SongCatalog.all()) {
-            playlist.add(createSong(song));
-        }
-
-        player.addListener(new Player.Listener() {
-
-            @Override
-            public void onMediaItemTransition(
-                    MediaItem mediaItem, int reason) {
+    /** 재생 서비스에 MediaController로 연결한다 (연결만으로는 재생하지 않는다) */
+    private void connectPlayer() {
+        SessionToken token = new SessionToken(this, new ComponentName(this, CarinPlaybackService.class));
+        final ListenableFuture<MediaController> future = new MediaController.Builder(this, token).buildAsync();
+        controllerFuture = future;
+        statusText.setText("플레이어 연결 중");
+        future.addListener(() -> {
+            if (future != controllerFuture) return;   // 그 사이 onStop으로 연결이 취소됨
+            try {
+                MediaController controller = future.get();
+                player = controller;
+                controller.addListener(playerListener);
+                showPlayingState(controller.isPlaying());
+                if (controller.getPlaybackState() == Player.STATE_ENDED) statusText.setText("재생 완료");
                 updateSongInfo();
-            }
-
-            @Override
-            public void onIsPlayingChanged(
-                    boolean isPlaying) {
-
-                playButton.setIcon(
-                        isPlaying
-                                ? CarinIcon.Type.PAUSE
-                                : CarinIcon.Type.PLAY
-                );
-
-                statusText.setText(
-                        isPlaying
-                                ? "♪ 재생 중"
-                                : "일시정지"
-                );
-                CarinTheme.styleChip(statusText, CarinTheme.LIGHT_ROSE);
-
-                // 노래방 화면의 재생 버튼도 같은 플레이어 상태를 따른다
-                karaokePanel.setPlaying(isPlaying);
-            }
-
-            @Override
-            public void onPlaybackStateChanged(int state) {
-                if (state == Player.STATE_ENDED) {
-                    statusText.setText("재생 완료");
-                }
-            }
-
-            @Override
-            public void onPlayerError(
-                    PlaybackException error) {
-                statusText.setText(
-                        "재생 오류: "
-                                + error.getErrorCodeName()
-                );
+                Log.d("CARIN_PLAYBACK", "MediaController 연결: 곡 " + controller.getMediaItemCount()
+                        + "개, 재생 중=" + controller.isPlaying());
+            } catch (Exception e) {
+                Log.e("CARIN_PLAYBACK", "MediaController 연결 실패", e);
+                statusText.setText("플레이어 연결 실패");
                 CarinTheme.styleChip(statusText, WARN);
             }
-        });
-
-        player.setMediaItems(playlist);
-        player.prepare();
-
-        updateSongInfo();
-        uiHandler.post(progressTicker);
+        }, getMainExecutor());
     }
 
     /** 현재 노래 제목 및 순번 갱신 */
@@ -866,9 +871,14 @@ public class MainActivity extends Activity {
     @Override
     protected void onStop() {
         uiHandler.removeCallbacks(progressTicker);
+        // 화면 연결만 해제한다. 플레이어는 서비스가 소유하므로 재생은 계속된다
         if (player != null) {
-            player.release();
+            player.removeListener(playerListener);
             player = null;
+        }
+        if (controllerFuture != null) {
+            MediaController.releaseFuture(controllerFuture);
+            controllerFuture = null;
         }
 
         super.onStop();
@@ -923,10 +933,7 @@ public class MainActivity extends Activity {
 
             // 목록에서 곡을 누르면 해당 곡 재생
             songRow.setOnClickListener(v -> {
-                if (player != null) {
-                    player.seekTo(songIndex, 0);
-                    player.play();
-                }
+                playAt(songIndex);
             });
 
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(72));
@@ -1124,7 +1131,7 @@ public class MainActivity extends Activity {
         return heroMatches;
     }
 
-    // ── 재생: 기존 ExoPlayer 플레이리스트에서 곡을 찾아 재생 ──
+    // ── 재생: 서비스 플레이리스트(mediaId = SongCatalog.id)에서 곡을 찾아 재생 ──
 
     private void playMemorySong(Memory memory) {
         if (player == null) {
@@ -1134,8 +1141,7 @@ public class MainActivity extends Activity {
 
         for (int i = 0; i < player.getMediaItemCount(); i++) {
             if (memory.songId.equals(player.getMediaItemAt(i).mediaId)) {
-                player.seekTo(i, 0);
-                player.play();
+                playAt(i);
                 Toast.makeText(this,
                         memory.place + "에서 들었던 '" + SongCatalog.titleOf(memory.songId)
                                 + "'을(를) 재생합니다",

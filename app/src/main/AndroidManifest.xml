@@ -5,6 +5,9 @@
     <uses-permission android:name="pleos.car.permission.CAR_SEATS" />
     <!-- NaviHelper 목적지 조회 권한 (protection level: normal) -->
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
+    <!-- 백그라운드 음악 재생 (Media3 재생 서비스가 재생 중 포그라운드로 전환) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <!-- 사진 선택기 탐색용 (Android 11+ 패키지 가시성) -->
     <queries>
@@ -56,6 +59,29 @@
             </intent-filter>
 
         </activity>
+
+        <!--
+            CAR IN 재생 서비스: 플레이어를 하나만 소유하고 차량 미디어 시스템에 탐색·제어를 제공한다.
+            Pleos Music/Audio 가이드: MediaBrowserService 액션과 Media3 MediaLibraryService 액션을 함께 선언.
+        -->
+        <service
+            android:name=".playback.CarinPlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaLibraryService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
+        <!-- 서비스가 꺼져 있을 때 미디어 버튼(시스템 재개 요청)을 받아 onPlaybackResumption으로 연결 -->
+        <receiver
+            android:name="androidx.media3.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
 
     </application>
 </manifest>

@@ -17,6 +17,9 @@
 | `memory/MemoryListPage.java` | "카인 추억" 탭: 사진 카드 그리드, 빈 상태, 등록·데모 버튼 | 리디자인 |
 | `memory/MemoryDetailDialog.java` | 추억 상세: 사진 + 경로선, 메타, 그날의 노래·노래방·사진 연결·삭제 | 리디자인 |
 | `memory/MemoryRegisterDialog.java` | 등록 다이얼로그 (곡은 알약 탭으로 선택) | MVP + 리디자인 |
+| `playback/CarinPlaybackService.java` | 재생 서비스(MediaLibraryService): 플레이어 소유, 탐색·검색·재개·포커스·종료 처리 | B1 |
+| `playback/CarinPlaylist.java` | 탐색 구조와 곡 MediaItem·메타데이터 | B1 |
+| `debug/.../MediaBrowseProbeActivity.java` | debug 전용 MBS 탐색·mediaId 재생 점검 | B1 |
 | `karaoke/KaraokePanel.java` | 노래방 전체 화면 오버레이: 현재 줄 강조 가사, 진행 바, 원형 컨트롤 | CAR IN + 리디자인 |
 | `karaoke/DemoLyrics.java` | 팀 자체 제작 정적 데모 가사 (`linesFor()`로 줄 단위 제공) | CAR IN |
 | `karaoke/PhotoPicker.java` | 동작하는 사진 선택기 탐색 | CAR IN |
@@ -105,13 +108,29 @@ FrameLayout (앱 배경: Deep Vinyl + 상단 코랄 빛)
    └─ onResume: 열려 있으면 UXR 재확인, 주차 아니면 닫음
 ```
 
-## 4. 기존 플레이어와의 연동 방식
+## 4. 재생 구조 (Media3 MediaLibraryService)
 
-- 플레이어는 기존처럼 `onStart()`에서 생성, `onStop()`에서 `release()`. Memory Route·노래방·미니 플레이어 모두 **이 인스턴스를 그대로 사용**하며 별도 플레이어를 만들지 않는다.
-- 노래방을 **별도 Activity가 아닌 같은 Activity의 오버레이**로 둔 이유: Activity 전환 시 `onStop()`이 플레이어를 해제해 음악이 끊기기 때문.
-- 재생 제어는 `togglePlay()` / `skipPrevious()` / `skipNext()` 세 메서드에만 있고, 미니 플레이어와 노래방 패널이 이를 함께 호출한다.
-- 진행 바는 `onStart()`에서 시작하는 0.5초 주기 `progressTicker`가 갱신하고, `onStop()`에서 멈춘다.
-- 곡 식별은 `SongCatalog.Song.id` ↔ `MediaItem.mediaId`. 추억의 `songId`가 플레이리스트에 없으면 토스트만 띄우고 크래시 없이 종료한다.
+```
+CarinPlaybackService (MediaLibraryService, ExoPlayer 1개 소유)
+ ├─ 생성: 곡 목록 준비, playWhenReady=false (자동 재생 없음)
+ ├─ ExoPlayer: AudioAttributes(MEDIA/MUSIC, 포커스 자동 처리), 출력 분리 시 일시정지
+ ├─ MediaLibrarySession ← MainActivity(MediaController), 차량 미디어 시스템(MBS), 미디어 버튼
+ │   ├─ onGetLibraryRoot / onGetChildren: carin_root → carin_playlist → carin_song_0N
+ │   ├─ onSearch / onGetSearchResult: 곡 제목 검색 (음성 연동용)
+ │   ├─ onAddMediaItems: mediaId → URI 포함 항목
+ │   ├─ onSetMediaItems: 곡 하나를 골라도 전체 목록 유지 + 그 곡부터
+ │   └─ onPlaybackResumption: 마지막 곡·위치 (prefs carin_playback)
+ ├─ 영구 포커스 상실 → stop / 재생 종료 → 다음 재개를 첫 곡으로
+ └─ onTaskRemoved → 정지 → stopSelf, onDestroy → 플레이어·세션 해제
+MainActivity
+ ├─ onCreate: startService (Started 상태로 두어 onTaskRemoved 수신)
+ ├─ onStart: SessionToken → MediaController.buildAsync → Player 리스너·화면 동기화
+ └─ onStop: 리스너 제거, releaseFuture (재생은 서비스에서 계속)
+```
+
+- `togglePlay`/`skipPrevious`/`skipNext`/`playAt`은 `Player` 인터페이스(MediaController)만 사용한다. 곡 목록 행·추억 재생·노래방이 모두 이 메서드를 쓴다.
+- Manifest: 서비스(`foregroundServiceType=mediaPlayback`, MediaLibraryService·MediaBrowserService 액션), `MediaButtonReceiver`, `FOREGROUND_SERVICE`·`FOREGROUND_SERVICE_MEDIA_PLAYBACK` 권한.
+- 기준: [Pleos Music/Audio 앱 개발 가이드](https://document.pleos.ai/en/docs/pleos-only/vehicle-app-developer-guide/music-audio-app-developement-guide).
 
 ## 5. 디자인 시스템 (`ui/`)
 
