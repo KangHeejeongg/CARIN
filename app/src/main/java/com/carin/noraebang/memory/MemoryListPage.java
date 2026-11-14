@@ -39,6 +39,8 @@ public final class MemoryListPage extends LinearLayout {
     private final int columns;
     private final LinearLayout grid;
     private final TextView countChip;
+    /** 저장 데이터 손상 시 보호 상태를 알리는 칩 (정상일 때 숨김) */
+    private final TextView storageChip;
 
     /** @param columns 한 줄에 놓을 카드 수 */
     public MemoryListPage(Context context, Listener listener, int columns) {
@@ -61,6 +63,11 @@ public final class MemoryListPage extends LinearLayout {
         LayoutParams chipParams = new LayoutParams(-2, -2);
         chipParams.leftMargin = dp(16);
         titleRow.addView(countChip, chipParams);
+        storageChip = CarinTheme.chip(context, "", CarinTheme.AMBER);
+        storageChip.setVisibility(GONE);
+        LayoutParams storageParams = new LayoutParams(-2, -2);
+        storageParams.leftMargin = dp(12);
+        titleRow.addView(storageChip, storageParams);
         titles.addView(titleRow);
         LayoutParams subParams = new LayoutParams(-1, -2);
         subParams.topMargin = dp(6);
@@ -81,6 +88,24 @@ public final class MemoryListPage extends LinearLayout {
         LayoutParams gridParams = new LayoutParams(-1, -2);
         gridParams.topMargin = dp(28);
         addView(grid, gridParams);
+    }
+
+    /**
+     * 저장 데이터 상태 칩을 갱신한다.
+     *
+     * @param writeProtected 원문 배열이 손상되어 변경이 차단된 상태
+     * @param unreadable     읽지 못했지만 원문으로 보존 중인 레코드 수
+     */
+    public void setStorageStatus(boolean writeProtected, int unreadable) {
+        if (writeProtected) {
+            storageChip.setText("저장 데이터 보호 중 · 변경 차단");
+        } else if (unreadable > 0) {
+            storageChip.setText("읽지 못한 기록 " + unreadable + "개 · 원본 보존");
+        } else {
+            storageChip.setVisibility(GONE);
+            return;
+        }
+        storageChip.setVisibility(VISIBLE);
     }
 
     /** 목록을 다시 그린다 */

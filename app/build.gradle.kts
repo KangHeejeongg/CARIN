@@ -63,6 +63,8 @@ dependencies {
     implementation(libs.appcompat)
     implementation(libs.material)
     testImplementation(libs.junit)
+    // JVM 단위 테스트 전용: android.jar의 org.json은 빈 스텁이라 MemoryCodecTest에 실제 구현이 필요하다 (APK 미포함)
+    testImplementation("org.json:json:20240303")
     // Media3 - 음악 파일을 재생하는 플레이어
     implementation("androidx.media3:media3-exoplayer:1.11.1")
     implementation("ai.pleos.playground:Vehicle:2.3.2")

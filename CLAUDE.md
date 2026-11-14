@@ -57,7 +57,8 @@ MainActivity (메뉴 + 플레이어 + Memory Route + 노래방 오버레이 오�
  ├─ memory/
  │   ├─ SongCatalog       번들 음원(res/raw) ↔ 고정 문자열 ID ↔ 제목. 플레이리스트의 단일 출처
  │   ├─ Memory            추억 1건 (id, place, title, travelDate, songId, createdAt, demo, photoUri?)
- │   ├─ MemoryStore       SharedPreferences("carin_memory_route") + JSON 배열 영속화
+ │   ├─ MemoryStore       SharedPreferences("carin_memory_route") + JSON 배열 영속화. 손상 시 쓰기 차단·백업
+ │   ├─ MemoryCodec       저장 원문 ↔ Memory. 손상 레코드 원문 보존 (JVM 테스트: MemoryCodecTest)
  │   ├─ PlaceMatcher      장소명 ↔ 목적지(name/address) 지역 단위 매칭
  │   ├─ MemoryListPage     "카인 추억" 탭의 사진 카드 그리드
  │   ├─ MemoryDetailDialog / MemoryRegisterDialog   CarinDialog 기반 상세(사진·재생·노래방·삭제)·입력 UI
@@ -82,6 +83,7 @@ MainActivity (메뉴 + 플레이어 + Memory Route + 노래방 오버레이 오�
 - **메인 화면 구조.** 헤더(주행 상태 칩·로고·목적지 칩) → 탭 3개 → 페이지(플레이리스트: 히어로 카드 + 곡 목록 + Memory Route 패널 / 추억: `MemoryListPage`) → 하단 미니 플레이어. 노래방 탭은 오버레이를 연다.
 - **추억 제안 중복 방지.** 추억 발견 시 팝업 대신 히어로 카드가 "지난번 이 길에서 들었던 노래가 있어요"로 바뀐다. `applyDestination()`은 `source|normalize(name)|normalize(address)` 키를 `lastPromptedKey`와 비교해 같은 목적지에는 탭 전환·강조를 한 번만 한다. 히어로는 항상 다시 그린다.
 - **매칭은 substring이 아니라 토큰 완전 일치.** `PlaceMatcher`는 공백/쉼표로 토큰을 나누고 행정 접미사(시·군·구·역·광역시…)를 떼어 비교한다. "강릉" ↔ "강릉역"/"강원특별자치도 강릉시 …"는 일치, "산" ↔ "부산"은 불일치. 규칙을 바꾸면 `PlaceMatcherTest`를 함께 수정한다.
+- **저장 원문을 덮어쓰지 않는다.** `MemoryStore`의 모든 쓰기는 `write()`를 거친다: 배열 전체 손상이면 차단(`isWriteProtected()`), 일부 손상 레코드는 원문 그대로 다시 저장. 새 쓰기 메서드를 만들 때 `saveAll` 같은 직접 덮어쓰기를 추가하지 말 것.
 - **사진은 항상 앱 내부 복사본.** AAOS에서 `OPEN_DOCUMENT/GET_CONTENT`는 `com.android.car.frameworkpackagestubs` 스텁("파일 관리 미지원")으로 가고, 포토 피커(`android.provider.action.PICK_IMAGES`) URI는 영구 권한이 없다. 그래서 `PhotoPicker.importToAppStorage()`로 `files/photos/*.jpg`에 복사한 `file://` URI만 저장한다. 노래방 배경은 prefs `carin_karaoke`, 추억 사진은 `Memory.photoUri`.
 - **주행 안전.** 텍스트 입력·기록 삭제·노래방 진입·사진 선택 전에 `DrivingSafetyGuard.check()`를 호출하고 `PARKED`일 때만 진행한다. 노래방이 열린 채 `onResume`되면 다시 확인한다. `UNKNOWN`(차량 서비스 접근 불가)도 제한으로 취급한다. 속도 0만으로 주차라고 판단하지 않는다. 음악 재생은 제한하지 않는다. Vehicle SDK의 `Gear` API는 `@hide/@Deprecated`라 쓰지 않는다.
 - **SDK 콜백은 백그라운드 스레드로 온다.** `NaviDestinationClient`가 `Handler(Looper.getMainLooper())`로 올린 뒤 콜백한다. Vehicle SDK 좌석 조회도 `runOnUiThread`로 감싼다. 둘 다 `onDestroy`에서 `release()`.

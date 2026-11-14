@@ -122,6 +122,10 @@ public final class MemoryRegisterDialog {
                         Toast.LENGTH_LONG).show();
                 dialog.dismiss();
                 onSaved.onSaved(memory);
+            } else if (store.isWriteProtected()) {
+                // 저장 원문이 손상되어 덮어쓰기를 막은 경우: 입력값은 그대로 두고 이유를 안내
+                Toast.makeText(activity, "저장된 추억 데이터를 읽을 수 없어 기존 기록을 보호하기 위해 "
+                        + "저장을 막았어요. 기존 데이터는 그대로 보존됩니다.", Toast.LENGTH_LONG).show();
             } else {
                 Toast.makeText(activity, "저장에 실패했습니다. 다시 시도해 주세요.",
                         Toast.LENGTH_LONG).show();

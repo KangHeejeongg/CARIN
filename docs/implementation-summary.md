@@ -10,7 +10,8 @@
 | `MainActivity.java` | 헤더·탭·페이지·미니 플레이어·히어로 카드·노래방 오버레이를 묶는 단일 화면. 플레이어·목적지·안전·사진 로직 | 기존 + 확장 + 리디자인 |
 | `memory/SongCatalog.java` | 번들 음원 ↔ 고정 ID(`carin_song_01`…) ↔ 제목. 플레이리스트와 추억이 공유하는 단일 출처 | MVP |
 | `memory/Memory.java` | 추억 모델 + JSON (`photoUri` 선택 필드, 하위 호환) | MVP + CAR IN |
-| `memory/MemoryStore.java` | SharedPreferences(JSON) 저장소. 조회/추가/수정/삭제/데모/매칭 | MVP + CAR IN |
+| `memory/MemoryStore.java` | SharedPreferences(JSON) 저장소. 조회/추가/수정/삭제/데모/매칭. 손상 시 쓰기 차단·백업(`isWriteProtected()`, `unreadableCount()`) | MVP + CAR IN + 저장 보호 |
+| `memory/MemoryCodec.java` | 저장 원문 ↔ Memory 변환. 손상 레코드 원문 보존, 배열 손상 판정 (Android 비의존, JVM 테스트) | 저장 보호 |
 | `memory/PlaceMatcher.java` | 지역 단위 매칭(토큰 + 접미사 제거 + 완전 일치) | MVP |
 | `memory/MemoryListPage.java` | "카인 추억" 탭: 사진 카드 그리드, 빈 상태, 등록·데모 버튼 | 리디자인 |
 | `memory/MemoryDetailDialog.java` | 추억 상세: 사진 + 경로선, 메타, 그날의 노래·노래방·사진 연결·삭제 | 리디자인 |
@@ -117,14 +118,27 @@ FrameLayout (앱 배경: Deep Vinyl + 상단 코랄 빛)
 - 이미지 리소스를 추가하지 않고 아이콘·로고·경로선을 `Canvas`로 그린다. 글로우는 `setElevation` + `setOutlineSpotShadowColor`(API 28+).
 - 기본 이미지: `ImageLoader`가 사용자 사진 → `assets/backgrounds/<slot>.(jpg|jpeg|png|webp)` → `default.*` → 뷰 배경(노을 그라디언트) 순으로 표시한다. 현재 슬롯 이미지는 비어 있다.
 
-## 6. 사진 처리
+## 6. 저장 데이터 보호
+
+| 원문 상태 | 읽기 | 쓰기(add/delete/update/createDemo) | 백업 | 화면 |
+|---|---|---|---|---|
+| 없음·빈 값 | 0건 | 정상 | — | — |
+| 정상 배열 | 전체 | 정상. 저장 직전 원문을 `memories_prev`에 한 세대 보관 | — | — |
+| 레코드 일부 손상 (필수 필드 누락, 객체가 아닌 값) | 읽을 수 있는 기록만 | 정상. 읽지 못한 레코드는 원래 JSON 값 그대로 함께 저장 | 처음 발견 시 `memories_backup`(최초 1회) + `files/memory_backups/memory_backup_<ms>.json` | 추억 탭 칩 "읽지 못한 기록 N개 · 원본 보존" |
+| 배열 전체 손상 | 0건 | **차단**: 원문 변경 없이 false/null | 위와 같음 | 칩 "저장 데이터 보호 중 · 변경 차단", 등록·삭제·사진 연결·데모 생성 시 안내 토스트 |
+
+- 반환형은 그대로이고, 실패 원인은 `MemoryStore.isWriteProtected()`로 구분한다. 호출부: `MainActivity`(`openRegisterDialog`, `onPickPhoto`, `confirmDeleteMemory`, `onActivityResult`, `createDemoData`), `MemoryRegisterDialog`.
+- 같은 손상 원문은 해시로 한 번만 백업한다. `commit()` 실패 시 기존 원문이 유지되고 false를 반환한다.
+- 검증: `MemoryCodecTest` 6건(빈 값, 정상 왕복, 이전 형식, 일부 손상 보존, 배열 손상, 배열이 아닌 최상위). JVM 테스트용으로 `testImplementation("org.json:json:20240303")`(APK 미포함).
+
+## 7. 사진 처리
 
 - 선택기: `PhotoPicker.buildIntent()`가 `PICK_IMAGES`(API 33+) → `GET_CONTENT` → `OPEN_DOCUMENT` → `PICK` 순으로 조회하고, AAOS의 `com.android.car.frameworkpackagestubs`("파일 관리 미지원" 스텁)는 제외한다. Pleos 에뮬레이터에서는 시스템 포토 피커(`com.android.providers.media.module`)가 선택된다.
 - 저장: 포토 피커 URI는 영구 권한이 없으므로 `importToAppStorage()`가 최대 1600px로 축소해 `files/photos/<uuid>.jpg`로 복사하고 `file://` URI를 보관한다. 노래방 배경은 prefs `carin_karaoke.background_uri`, 추억 사진은 `Memory.photoUri`.
 - 표시: `ImageLoader`가 백그라운드 스레드에서 축소 디코딩하고, 같은 뷰에 더 최근 요청이 있으면 이전 결과를 버린다(뷰 tag 비교).
 - 실패 처리: 디코딩 실패 → 토스트 + 기본 배경. 상세 화면에서 파일이 없으면 "사진을 열 수 없어요" 안내.
 
-## 7. SDK / 플랫폼 API (소스 jar에서 확인한 것만 사용)
+## 8. SDK / 플랫폼 API (소스 jar에서 확인한 것만 사용)
 
 | SDK | 사용 API |
 |---|---|

@@ -296,7 +296,7 @@ public class MainActivity extends Activity {
         selectedTab = tab;
         playlistPage.setVisibility(tab == TAB_MEMORY ? View.GONE : View.VISIBLE);
         memoryPageScroll.setVisibility(tab == TAB_MEMORY ? View.VISIBLE : View.GONE);
-        if (tab == TAB_MEMORY) memoryPage.setMemories(memoryStore.getAll());
+        if (tab == TAB_MEMORY) refreshMemoryPage();
         updateTabHighlight();
     }
 
@@ -1110,7 +1110,7 @@ public class MainActivity extends Activity {
                     destinationSource == DestinationSource.DEMO ? WARN : ACCENT);
         }
 
-        if (selectedTab == TAB_MEMORY) memoryPage.setMemories(memoryStore.getAll());
+        if (selectedTab == TAB_MEMORY) refreshMemoryPage();
         return heroMatches;
     }
 
@@ -1143,6 +1143,8 @@ public class MainActivity extends Activity {
 
     private void openRegisterDialog() {
         if (!ensureParkedForRestrictedFeature()) return;
+        // 입력을 다 받은 뒤 저장이 막히지 않도록 쓰기 보호 상태면 폼을 열기 전에 안내한다
+        if (showIfWriteProtected()) return;
 
         String defaultPlace = destinationSource == DestinationSource.NONE
                 ? null : destinationName;
@@ -1190,6 +1192,8 @@ public class MainActivity extends Activity {
             @Override
             public boolean onPickPhoto(Memory target) {
                 if (!ensureParkedForRestrictedFeature()) return false;
+                // 사진을 복사한 뒤 저장이 막히면 고아 파일이 생기므로 선택기를 열기 전에 확인
+                if (showIfWriteProtected()) return false;
                 pendingPhotoMemoryId = target.id;
                 return startPhotoPicker(REQ_PICK_MEMORY_PHOTO);
             }
@@ -1204,6 +1208,7 @@ public class MainActivity extends Activity {
     /** 주차 상태에서만, 확인 후 추억을 삭제한다 */
     private void confirmDeleteMemory(Memory memory) {
         if (!ensureParkedForRestrictedFeature()) return;
+        if (showIfWriteProtected()) return;
 
         CarinDialog confirm = new CarinDialog(this, "추억 삭제", null);
         confirm.setMessage("'" + memory.title + "' 기록을 삭제할까요?\n삭제한 추억은 되돌릴 수 없어요.");
@@ -1214,7 +1219,7 @@ public class MainActivity extends Activity {
                 Toast.makeText(this, "삭제되었습니다", Toast.LENGTH_SHORT).show();
                 if (detailDialog != null) detailDialog.dismiss();
                 refreshMemoryViews();
-            } else {
+            } else if (!showIfWriteProtected()) {
                 Toast.makeText(this, "삭제에 실패했습니다", Toast.LENGTH_SHORT).show();
             }
         });
@@ -1401,7 +1406,7 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "'" + target.title + "'에 사진을 연결했습니다.", Toast.LENGTH_SHORT).show();
             refreshMemoryViews();
             showMemoryDetail(updated);
-        } else {
+        } else if (!showIfWriteProtected()) {
             Toast.makeText(this, "사진 연결에 실패했습니다.", Toast.LENGTH_SHORT).show();
         }
     }
@@ -1420,20 +1425,45 @@ public class MainActivity extends Activity {
     }
 
     private void createDemoData() {
+        if (showIfWriteProtected()) return;
         if (memoryStore.hasDemo()) {
             Toast.makeText(this, "강릉 데모 기록이 이미 있습니다.", Toast.LENGTH_SHORT).show();
             return;
         }
         Memory demo = memoryStore.createDemo();
         if (demo == null) {
-            Toast.makeText(this, "재생 가능한 곡이 없어 데모를 만들 수 없습니다.",
-                    Toast.LENGTH_LONG).show();
+            if (!showIfWriteProtected()) {
+                Toast.makeText(this, "재생 가능한 곡이 없어 데모를 만들 수 없습니다.",
+                        Toast.LENGTH_LONG).show();
+            }
             return;
         }
         Toast.makeText(this,
                 "데모 기록 생성: " + demo.place + " · " + SongCatalog.titleOf(demo.songId),
                 Toast.LENGTH_LONG).show();
         refreshMemoryViews();
+    }
+
+    // ── 저장 데이터 보호 ──
+
+    /** 저장 데이터를 보호하느라 변경을 막았을 때 보여주는 안내 */
+    static final String WRITE_PROTECTED_MESSAGE =
+            "저장된 추억 데이터를 읽을 수 없어 기존 기록을 보호하기 위해 변경을 막았어요. 기존 데이터는 그대로 보존됩니다.";
+
+    /**
+     * 추억 저장소가 쓰기 보호 상태(원문 배열 손상)이면 안내 토스트를 띄우고 true를 반환한다.
+     * 저장 실패 원인을 일반 실패와 구분할 때도 쓴다.
+     */
+    private boolean showIfWriteProtected() {
+        if (!memoryStore.isWriteProtected()) return false;
+        Toast.makeText(this, WRITE_PROTECTED_MESSAGE, Toast.LENGTH_LONG).show();
+        return true;
+    }
+
+    /** 추억 탭 목록과 저장 상태 칩을 갱신한다 */
+    private void refreshMemoryPage() {
+        memoryPage.setMemories(memoryStore.getAll());
+        memoryPage.setStorageStatus(memoryStore.isWriteProtected(), memoryStore.unreadableCount());
     }
 
     // ── 주행 안전 제한 ──
