@@ -26,6 +26,7 @@ import androidx.media3.common.PlaybackException;
 import androidx.media3.exoplayer.ExoPlayer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import ai.pleos.playground.navi.constants.NaviErrorCode;
 import ai.pleos.playground.navi.data.DestinationInfo;
@@ -41,6 +42,7 @@ import com.carin.noraebang.memory.MemoryDetailDialog;
 import com.carin.noraebang.memory.MemoryListPage;
 import com.carin.noraebang.memory.MemoryRegisterDialog;
 import com.carin.noraebang.memory.MemoryStore;
+import com.carin.noraebang.memory.PhotoRetention;
 import com.carin.noraebang.memory.PlaceMatcher;
 import com.carin.noraebang.memory.SongCatalog;
 import com.carin.noraebang.navi.NaviDestinationClient;
@@ -418,7 +420,10 @@ public class MainActivity extends Activity {
             setHeroChip("MEMORY ROUTE", ACCENT);
             heroTitle.setText("그 길을 다시 달릴 때,");
             heroQuestion.setText("그날의 노래가 흘러나옵니다.");
-            heroMeta.setText(total == 0
+            boolean protectedStore = memoryStore.isWriteProtected();
+            heroMeta.setText(protectedStore
+                    ? "저장된 추억을 읽을 수 없어 기존 기록을 보호하고 있어요"
+                    : total == 0
                     ? "아직 저장된 추억이 없어요 · 여행의 노래를 남겨보세요"
                     : "저장된 추억 " + total + "개 · 목적지를 조회하거나 선택하면 추억을 찾아드려요");
             heroSongRow.setVisibility(View.GONE);
@@ -426,7 +431,7 @@ public class MainActivity extends Activity {
                     this::querySdkDestination);
             addHeroAction("데모 목적지", CarinIcon.Type.PIN, PillButton.Style.GHOST,
                     this::showDemoDestinationPicker);
-            if (total == 0) {
+            if (total == 0 && !protectedStore) {
                 addHeroAction("추억 등록", CarinIcon.Type.PLUS, PillButton.Style.GHOST,
                         this::openRegisterDialog);
             }
@@ -1155,7 +1160,11 @@ public class MainActivity extends Activity {
                 ? null : destinationName;
 
         MemoryRegisterDialog.show(this, memoryStore, defaultPlace,
-                memory -> refreshMemoryViews());
+                memory -> {
+                    // 저장으로 직전 원문이 바뀌었으므로 더 이상 참조되지 않는 대기 사진을 정리
+                    sweepReleasedPhotos();
+                    refreshMemoryViews();
+                });
     }
 
     private final MemoryListPage.Listener memoryPageListener = new MemoryListPage.Listener() {
@@ -1222,6 +1231,7 @@ public class MainActivity extends Activity {
             confirm.dismiss();
             if (memoryStore.delete(memory.id)) {
                 Toast.makeText(this, "삭제되었습니다", Toast.LENGTH_SHORT).show();
+                sweepReleasedPhotos();
                 if (detailDialog != null) detailDialog.dismiss();
                 refreshMemoryViews();
             } else if (!showIfWriteProtected()) {
@@ -1481,15 +1491,34 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * 교체되어 빠진 이전 사진 파일을 지운다.
-     * 앱이 만든 파일이고, 어떤 추억(읽지 못한 레코드 포함)이나 노래방 설정도 참조하지 않을 때만 삭제한다.
+     * 교체되어 빠진 이전 사진을 삭제 대기 목록에 넣고, 지금 지워도 되는 대기 사진을 정리한다.
+     * 교체 직후 이전 사진은 memories_prev(복원용 직전 원문)가 참조하므로 바로 지워지지 않는다.
      */
     private void releaseReplacedPhoto(String oldUri, String newUri) {
-        if (oldUri == null || oldUri.equals(newUri)) return;
-        if (memoryStore.isPhotoReferenced(oldUri)) return;
+        if (oldUri != null && !oldUri.equals(newUri)) {
+            memoryStore.deferPhotoRelease(oldUri);
+        }
+        sweepReleasedPhotos();
+    }
+
+    /**
+     * 삭제 대기 사진 중 현재 원문·직전 원문·손상 백업·노래방 설정 어디에서도 참조하지 않는
+     * 앱 소유 파일만 지운다. 추억 저장(등록·삭제·사진 연결·데모 생성) 성공 뒤마다 호출한다.
+     */
+    private void sweepReleasedPhotos() {
+        Set<String> pending = memoryStore.pendingPhotoReleases();
+        if (pending.isEmpty()) return;
+        List<String> inUse = new ArrayList<>();
         Uri karaoke = loadKaraokePhoto();
-        if (karaoke != null && oldUri.equals(karaoke.toString())) return;
-        PhotoImporter.deleteOwnedPhoto(this, oldUri);
+        if (karaoke != null) inUse.add(karaoke.toString());
+
+        List<String> releasable = PhotoRetention.releasable(pending, memoryStore.snapshotTexts(), inUse);
+        for (String uri : releasable) {
+            PhotoImporter.deleteOwnedPhoto(this, uri);
+        }
+        memoryStore.forgetPhotoReleases(releasable);
+        Log.d("CARIN_PHOTO", "삭제 대기 사진 정리: 대기 " + pending.size()
+                + " · 삭제 " + releasable.size() + " · 보관본 참조로 유지 " + (pending.size() - releasable.size()));
     }
 
     /** 노래방 배경 사진 설정을 동기 저장한다. 저장 성공 시 true */
@@ -1523,6 +1552,7 @@ public class MainActivity extends Activity {
         Toast.makeText(this,
                 "데모 기록 생성: " + demo.place + " · " + SongCatalog.titleOf(demo.songId),
                 Toast.LENGTH_LONG).show();
+        sweepReleasedPhotos();
         refreshMemoryViews();
     }
 
@@ -1544,8 +1574,9 @@ public class MainActivity extends Activity {
 
     /** 추억 탭 목록과 저장 상태 칩을 갱신한다 */
     private void refreshMemoryPage() {
-        memoryPage.setMemories(memoryStore.getAll());
+        // 보호 상태가 빈 화면 문구에 반영되도록 상태를 먼저 전달한다
         memoryPage.setStorageStatus(memoryStore.isWriteProtected(), memoryStore.unreadableCount());
+        memoryPage.setMemories(memoryStore.getAll());
     }
 
     // ── 주행 안전 제한 ──

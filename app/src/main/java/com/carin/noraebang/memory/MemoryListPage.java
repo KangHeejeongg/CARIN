@@ -41,6 +41,8 @@ public final class MemoryListPage extends LinearLayout {
     private final TextView countChip;
     /** 저장 데이터 손상 시 보호 상태를 알리는 칩 (정상일 때 숨김) */
     private final TextView storageChip;
+    /** 저장 원문이 손상되어 변경이 차단된 상태 (빈 화면 문구를 바꾸는 데 사용) */
+    private boolean writeProtected = false;
 
     /** @param columns 한 줄에 놓을 카드 수 */
     public MemoryListPage(Context context, Listener listener, int columns) {
@@ -91,12 +93,13 @@ public final class MemoryListPage extends LinearLayout {
     }
 
     /**
-     * 저장 데이터 상태 칩을 갱신한다.
+     * 저장 데이터 상태 칩을 갱신한다. 빈 화면 문구에도 반영되므로 {@link #setMemories} 전에 호출한다.
      *
      * @param writeProtected 원문 배열이 손상되어 변경이 차단된 상태
      * @param unreadable     읽지 못했지만 원문으로 보존 중인 레코드 수
      */
     public void setStorageStatus(boolean writeProtected, int unreadable) {
+        this.writeProtected = writeProtected;
         if (writeProtected) {
             storageChip.setText("저장 데이터 보호 중 · 변경 차단");
         } else if (unreadable > 0) {
@@ -222,20 +225,29 @@ public final class MemoryListPage extends LinearLayout {
         box.setPadding(dp(40), dp(56), dp(40), dp(56));
         box.setBackground(CarinTheme.glass(c, 32));
 
-        ImageView icon = CarinTheme.icon(c, CarinIcon.Type.SPARKLE, CarinTheme.CORAL);
+        ImageView icon = CarinTheme.icon(c, CarinIcon.Type.SPARKLE,
+                writeProtected ? CarinTheme.AMBER : CarinTheme.CORAL);
         box.addView(icon, new LayoutParams(dp(64), dp(64)));
-        TextView title = CarinTheme.text(c, "아직 저장된 추억이 없어요", 26, CarinTheme.GLASS_WHITE, CarinTheme.BOLD);
+        // 보호 상태의 0건은 "기록이 없음"이 아니라 "읽을 수 없어 보호 중"이므로 문구와 동작을 구분한다
+        TextView title = CarinTheme.text(c, writeProtected
+                        ? "저장된 추억을 지금은 읽을 수 없어요"
+                        : "아직 저장된 추억이 없어요",
+                26, CarinTheme.GLASS_WHITE, CarinTheme.BOLD);
         title.setGravity(Gravity.CENTER);
         LayoutParams titleParams = new LayoutParams(-2, -2);
         titleParams.topMargin = dp(20);
         box.addView(title, titleParams);
-        TextView body = CarinTheme.text(c,
-                "여행지에서 들었던 노래를 등록하면, 다음에 그 길을 달릴 때 그날의 노래를 다시 들려드릴게요.",
+        TextView body = CarinTheme.text(c, writeProtected
+                        ? "저장 데이터가 손상되어 기존 기록과 백업을 그대로 보존하고 있어요. "
+                        + "데이터를 지키기 위해 새 추억 등록과 사진 변경을 잠시 막았어요."
+                        : "여행지에서 들었던 노래를 등록하면, 다음에 그 길을 달릴 때 그날의 노래를 다시 들려드릴게요.",
                 18, CarinTheme.MUTED, CarinTheme.REGULAR);
         body.setGravity(Gravity.CENTER);
         LayoutParams bodyParams = new LayoutParams(-2, -2);
         bodyParams.topMargin = dp(10);
         box.addView(body, bodyParams);
+
+        if (writeProtected) return box;   // 등록해도 저장되지 않으므로 등록 버튼을 보이지 않는다
 
         PillButton register = new PillButton(c, "첫 추억 등록하기", CarinIcon.Type.PLUS, PillButton.Style.PRIMARY);
         register.setOnClickListener(v -> listener.onRegister());

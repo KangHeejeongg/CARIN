@@ -60,6 +60,7 @@ MainActivity (메뉴 + 플레이어 + Memory Route + 노래방 오버레이 오�
  │   ├─ Memory            추억 1건 (id, place, title, travelDate, songId, createdAt, demo, photoUri?)
  │   ├─ MemoryStore       SharedPreferences("carin_memory_route") + JSON 배열 영속화. 손상 시 쓰기 차단·백업
  │   ├─ MemoryCodec       저장 원문 ↔ Memory. 손상 레코드 원문 보존 (JVM 테스트: MemoryCodecTest)
+ │   ├─ PhotoRetention    사진 파일 삭제 가능 판단: 현재·직전·손상 백업 원문 참조 검사 (JVM 테스트: PhotoRetentionTest)
  │   ├─ PlaceMatcher      장소명 ↔ 목적지(name/address) 지역 단위 매칭
  │   ├─ MemoryListPage     "카인 추억" 탭의 사진 카드 그리드
  │   ├─ MemoryDetailDialog / MemoryRegisterDialog   CarinDialog 기반 상세(사진·재생·노래방·삭제)·입력 UI
@@ -88,7 +89,7 @@ MainActivity (메뉴 + 플레이어 + Memory Route + 노래방 오버레이 오�
 - **추억 제안 중복 방지.** 추억 발견 시 팝업 대신 히어로 카드가 "지난번 이 길에서 들었던 노래가 있어요"로 바뀐다. `applyDestination()`은 `source|normalize(name)|normalize(address)` 키를 `lastPromptedKey`와 비교해 같은 목적지에는 탭 전환·강조를 한 번만 한다. 히어로는 항상 다시 그린다.
 - **매칭은 substring이 아니라 토큰 완전 일치.** `PlaceMatcher`는 공백/쉼표로 토큰을 나누고 행정 접미사(시·군·구·역·광역시…)를 떼어 비교한다. "강릉" ↔ "강릉역"/"강원특별자치도 강릉시 …"는 일치, "산" ↔ "부산"은 불일치. 규칙을 바꾸면 `PlaceMatcherTest`를 함께 수정한다.
 - **저장 원문을 덮어쓰지 않는다.** `MemoryStore`의 모든 쓰기는 `write()`를 거친다: 배열 전체 손상이면 차단(`isWriteProtected()`), 일부 손상 레코드는 원문 그대로 다시 저장. 새 쓰기 메서드를 만들 때 `saveAll` 같은 직접 덮어쓰기를 추가하지 말 것.
-- **사진은 항상 앱 내부 복사본.** AAOS에서 `OPEN_DOCUMENT/GET_CONTENT`는 `com.android.car.frameworkpackagestubs` 스텁("파일 관리 미지원")으로 가고, 포토 피커(`android.provider.action.PICK_IMAGES`) URI는 영구 권한이 없다. 그래서 `PhotoImporter.importAsync()`로 `files/photos/<uuid>.jpg`에 만든 `file://` URI만 저장한다. 노래방 배경은 prefs `carin_karaoke`, 추억 사진은 `Memory.photoUri`. 변환이나 저장(추억 `update`, 노래방 prefs `commit`)이 실패하면 새 파일을 지우고 기존 연결을 유지한다. 저장에 성공했을 때만, 어떤 추억 원문(`MemoryStore.isPhotoReferenced`)이나 노래방 설정도 참조하지 않는 이전 파일을 지운다. 기존 사진 일괄 변환·고아 파일 일괄 정리는 아직 없다.
+- **사진은 항상 앱 내부 복사본.** AAOS에서 `OPEN_DOCUMENT/GET_CONTENT`는 `com.android.car.frameworkpackagestubs` 스텁("파일 관리 미지원")으로 가고, 포토 피커(`android.provider.action.PICK_IMAGES`) URI는 영구 권한이 없다. 그래서 `PhotoImporter.importAsync()`로 `files/photos/<uuid>.jpg`에 만든 `file://` URI만 저장한다. 노래방 배경은 prefs `carin_karaoke`, 추억 사진은 `Memory.photoUri`. 변환이나 저장(추억 `update`, 노래방 prefs `commit`)이 실패하면 새 파일을 지우고 기존 연결을 유지한다. 교체된 이전 사진은 바로 지우지 않고 삭제 대기(`photos_pending_release`)에 넣는다. 추억 저장(등록·삭제·사진 연결·데모 생성) 성공 뒤 `sweepReleasedPhotos()`가 현재 원문·`memories_prev`·`memories_backup`·`files/memory_backups/*.json`·노래방 설정 어디에서도 참조하지 않는 대기 사진만 지운다(`PhotoRetention`). 그래서 직전 원문이나 손상 백업으로 복원해도 사진이 함께 돌아온다. 기존 사진 일괄 변환·고아 파일 일괄 정리는 아직 없다.
 - **주행 안전.** 텍스트 입력·기록 삭제·노래방 진입·사진 선택 전에 `DrivingSafetyGuard.check()`를 호출하고 `PARKED`일 때만 진행한다. 노래방이 열린 채 `onResume`되면 다시 확인한다. `UNKNOWN`(차량 서비스 접근 불가)도 제한으로 취급한다. 속도 0만으로 주차라고 판단하지 않는다. 음악 재생은 제한하지 않는다. Vehicle SDK의 `Gear` API는 `@hide/@Deprecated`라 쓰지 않는다.
 - **SDK 콜백은 백그라운드 스레드로 온다.** `NaviDestinationClient`가 `Handler(Looper.getMainLooper())`로 올린 뒤 콜백한다. Vehicle SDK 좌석 조회도 `runOnUiThread`로 감싼다. 둘 다 `onDestroy`에서 `release()`.
 - NaviHelper 조회 권한 `pleos.car.permission.NAVI_ROUTE`(normal)은 main 매니페스트에 있다. `app/src/debug/`의 `NaviProbeActivity`는 SDK 진단용 debug 전용 화면이며 release에 포함되지 않는다.

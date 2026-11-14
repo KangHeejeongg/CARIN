@@ -11,6 +11,7 @@
 | `memory/SongCatalog.java` | 번들 음원 ↔ 고정 ID(`carin_song_01`…) ↔ 제목. 플레이리스트와 추억이 공유하는 단일 출처 | MVP |
 | `memory/Memory.java` | 추억 모델 + JSON (`photoUri` 선택 필드, 하위 호환) | MVP + CAR IN |
 | `memory/MemoryStore.java` | SharedPreferences(JSON) 저장소. 조회/추가/수정/삭제/데모/매칭. 손상 시 쓰기 차단·백업(`isWriteProtected()`, `unreadableCount()`) | MVP + CAR IN + 저장 보호 |
+| `memory/PhotoRetention.java` | 사진 삭제 가능 판단 (현재·직전·손상 백업 원문의 파일 이름 참조) | 사진 보존 |
 | `memory/MemoryCodec.java` | 저장 원문 ↔ Memory 변환. 손상 레코드 원문 보존, 배열 손상 판정 (Android 비의존, JVM 테스트) | 저장 보호 |
 | `memory/PlaceMatcher.java` | 지역 단위 매칭(토큰 + 접미사 제거 + 완전 일치) | MVP |
 | `memory/MemoryListPage.java` | "카인 추억" 탭: 사진 카드 그리드, 빈 상태, 등록·데모 버튼 | 리디자인 |
@@ -147,9 +148,16 @@ onActivityResult: (추억이면 보호 상태 재확인) → PhotoImporter.impor
    실패 → 안내 토스트, 기존 연결 유지
    추억: applyMemoryPhoto → MemoryStore.update(withPhoto)
          실패(보호 상태/대상 없음/저장 실패) → 새 파일 삭제, 기존 연결 유지
-         성공 → releaseReplacedPhoto(이전 URI): 앱 소유 + 추억 원문·노래방 설정 어디에도 없을 때만 삭제
-   노래방: applyKaraokePhoto → prefs commit → 실패 시 새 파일 삭제 / 성공 시 이전 파일 정리
+         성공 → releaseReplacedPhoto(이전 URI): 삭제 대기(photos_pending_release)에 넣고 sweepReleasedPhotos()
+   노래방: applyKaraokePhoto → prefs commit → 실패 시 새 파일 삭제 / 성공 시 이전 파일을 삭제 대기 + 정리
+
+sweepReleasedPhotos() (추억 저장 성공 뒤마다: 등록·삭제·사진 연결·데모 생성)
+   PhotoRetention.releasable(대기 목록, 보관본[현재 원문, memories_prev, memories_backup, memory_backups/*.json], 노래방 설정)
+   → 어디에서도 파일 이름이 나오지 않는 앱 소유 파일만 삭제하고 대기 목록에서 제거
 ```
+
+사진 교체 예: A → B 교체 직후 memories_prev가 A를 참조하므로 A 유지. 다음 저장(B → C)으로 prev가 B가 되면 A 삭제, B 유지.
+따라서 직전 원문이나 손상 백업으로 복원하면 추억과 사진이 함께 돌아온다 (`PhotoRetentionTest`, 기기에서 memories ← memories_prev 복원 확인).
 
 - Activity가 가져오는 도중 종료되면 새 파일을 지운다.
 - 표시: `ImageLoader`가 백그라운드에서 축소 디코딩하고, 같은 뷰에 더 최근 요청이 있으면 이전 결과를 버린다.

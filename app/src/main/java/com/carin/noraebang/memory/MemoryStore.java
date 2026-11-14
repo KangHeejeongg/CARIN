@@ -4,15 +4,21 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -25,6 +31,7 @@ import java.util.UUID;
  * - 일부 레코드만 읽을 수 없으면 읽은 기록은 그대로 쓰고, 읽지 못한 레코드는 저장할 때 원래 값 그대로 함께 쓴다.
  * - 손상을 처음 발견하면 원문을 prefs("memories_backup")와 files/memory_backups/*.json에 백업한다.
  * - 정상 저장 직전의 원문은 prefs("memories_prev")에 한 세대 보관한다.
+ * - 사진 파일은 현재 원문과 위 보관본 중 하나라도 참조하면 지우지 않는다 ({@link PhotoRetention}).
  */
 public final class MemoryStore {
 
@@ -38,6 +45,8 @@ public final class MemoryStore {
     /** 이미 백업한 손상 원문의 해시 (같은 원문을 반복 백업하지 않기 위함) */
     private static final String KEY_BACKUP_HASH = "memories_backup_hash";
     private static final String BACKUP_DIR = "memory_backups";
+    /** 교체되어 지울 후보가 된 사진 URI (보관본이 더 이상 참조하지 않을 때 삭제) */
+    private static final String KEY_PENDING_RELEASE = "photos_pending_release";
 
     public static final String DEMO_PLACE = "강릉";
     public static final String DEMO_TITLE = "우리의 강릉 여행 (데모)";
@@ -77,15 +86,69 @@ public final class MemoryStore {
     }
 
     /**
-     * 저장 원문(읽지 못한 레코드 포함)이 이 사진 파일을 참조하는지.
-     * 교체된 이전 사진을 지워도 되는지 판단할 때 쓴다. JSON의 '/' 이스케이프와 무관하도록 파일 이름으로 비교한다.
+     * 현재 원문 또는 복원용 보관본(memories_prev, memories_backup, 백업 파일) 중
+     * 하나라도 이 사진 파일을 참조하는지. 읽지 못한 레코드도 원문 문자열 기준으로 포함된다.
      */
     public boolean isPhotoReferenced(String photoUri) {
-        if (photoUri == null || photoUri.isEmpty()) return false;
-        String raw = prefs.getString(KEY_MEMORIES, null);
-        if (raw == null) return false;
-        String name = photoUri.substring(photoUri.lastIndexOf('/') + 1);
-        return !name.isEmpty() && raw.contains(name);
+        return PhotoRetention.isReferenced(photoUri, snapshotTexts());
+    }
+
+    /**
+     * 사진 파일 참조 검사에 쓰는 모든 원문: 현재, 직전 한 세대, 손상 백업(prefs·파일).
+     * 이 중 하나로 복원했을 때 사진이 사라지지 않도록 보관본 전체를 본다.
+     */
+    public List<String> snapshotTexts() {
+        List<String> texts = new ArrayList<>();
+        addIfPresent(texts, prefs.getString(KEY_MEMORIES, null));
+        addIfPresent(texts, prefs.getString(KEY_PREVIOUS, null));
+        addIfPresent(texts, prefs.getString(KEY_BACKUP, null));
+        File[] files = new File(appContext.getFilesDir(), BACKUP_DIR).listFiles();
+        if (files != null) {
+            for (File file : files) {
+                addIfPresent(texts, readText(file));
+            }
+        }
+        return texts;
+    }
+
+    /** 교체·해제되어 지울 후보가 된 사진을 삭제 대기 목록에 넣는다 (실제 삭제는 참조가 모두 사라진 뒤) */
+    public void deferPhotoRelease(String photoUri) {
+        if (photoUri == null || photoUri.isEmpty()) return;
+        Set<String> pending = new HashSet<>(prefs.getStringSet(KEY_PENDING_RELEASE, new HashSet<>()));
+        if (pending.add(photoUri)) {
+            prefs.edit().putStringSet(KEY_PENDING_RELEASE, pending).commit();
+        }
+    }
+
+    /** 삭제 대기 중인 사진 URI 목록 (복사본) */
+    public Set<String> pendingPhotoReleases() {
+        return new HashSet<>(prefs.getStringSet(KEY_PENDING_RELEASE, new HashSet<>()));
+    }
+
+    /** 삭제했거나 더 관리할 필요가 없는 사진을 대기 목록에서 뺀다 */
+    public void forgetPhotoReleases(Collection<String> photoUris) {
+        if (photoUris.isEmpty()) return;
+        Set<String> pending = pendingPhotoReleases();
+        if (pending.removeAll(photoUris)) {
+            prefs.edit().putStringSet(KEY_PENDING_RELEASE, pending).commit();
+        }
+    }
+
+    private static void addIfPresent(List<String> texts, String text) {
+        if (text != null && !text.isEmpty()) texts.add(text);
+    }
+
+    private static String readText(File file) {
+        try (InputStream in = new FileInputStream(file)) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
+            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            Log.w(TAG, "백업 파일 읽기 실패: " + file.getName(), e);
+            return null;
+        }
     }
 
     /** 새 추억 저장. 저장 성공 시 true (쓰기 보호 상태면 false) */
