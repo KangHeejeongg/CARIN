@@ -110,9 +110,28 @@
 | `apk/CARIN_CAR_IN_release.apk` (백그라운드 재생·JPEG 배경·UXR 실시간 감시·사진 정리 포함, 15.5MB, 2026-11-15) | ✅ |
 | 배경 PNG → JPEG 변환 (APK 23.7MB → 15.5MB) | ✅ |
 
+## 8. Pleos 가이드 점검 (2026-11-15)
+
+출처: document.pleos.ai 의 Window Policy · Display Layout · UI Design Guide(Colors, Typography, Iconography) · Music/Audio 앱 개발 가이드 · 주행 제한 개발 가이드 · CCP 개발 가이드 · 앱 심사 가이드.
+
+| 항목 | 가이드 | 상태 | 비고 |
+|---|---|---|---|
+| Media Center 템플릿 | 음악 앱에 권장(필수 아님). 미적용 시 미디어 라이브러리 노출·Tune Knob·Media 버튼 미지원 | 🗓 미적용 | 공개 문서에 라이브러리 좌표·기반 클래스가 없음. 2차에 Pleos 측에 템플릿 제공 여부 문의 |
+| MBS / Media3 재생 서비스 | 모든 음악 앱 필수 | ✅ | `MediaLibraryService` + MBS 액션 동시 선언, `appCategory="audio"`, `androidx.car.app.launchable` |
+| 자동 재생 금지·포커스·`onTaskRemoved` | 필수 | ✅ | 기존 구현 |
+| 서브카테고리(Music) 전달 | 필수 | ⚠️ 부분 | 곡 `MEDIA_TYPE_MUSIC`, 루트 `MEDIA_TYPE_FOLDER_MIXED`, 플레이리스트 `MEDIA_TYPE_FOLDER_PLAYLISTS` 지정. 라이브러리에 전달하는 구체 키는 문서에 없음 → 실차 확인 필요 |
+| 가로·세로 창 모두 대응 | 필수 (세로 창 약 840dp) | ✅ | 세로 창에서 히어로 전체 너비·경로선 숨김, 노래방 헤더 재배치, 미니 플레이어 한 줄. 에뮬레이터 분할 창에서 확인 |
+| 대비 4.5:1 | 텍스트·아이콘·이미지 | ✅ | 코랄 버튼 위 흰 글자(2.3:1) → 딥 바이닐(7.2:1), FAINT `#877C84`(3.1:1) → `#A79CA4`(4.6:1) |
+| 최소 글자 크기 | 12sp 이상 권장 | ✅ | 최소 15sp |
+| 주행 제한 (`CarUxRestrictions` 리스너) | 필수 | ✅ | §6 |
+| CCP Back: 음악 앱은 Hide | 필수 | ✅ (코드) | `moveTaskToBack(true)`. 분할 창에서 adb Back이 앱 창에 전달되지 않아 기기 확인은 못 함 |
+| CCP 로터리 포커스 | 사용자 설치 앱은 선택, 터치만으로 완결되어야 함 | ✅ 터치 완결 | 로터리 포커스 이동은 미검증 |
+| 자동 애니메이션 최소화 | 권장 | ✅ | 목적지 일치 시 히어로 1회 강조(0.5초)만 |
+| 운전대 키·음성 검색(Gleo) | 운전대 키 필수, 검색은 선택 | ⏳ | Media3 세션이 미디어 버튼을 받고 검색 콜백도 구현. 실차 하드키·Gleo 음성은 에뮬레이터에서 확인 불가 (§3) |
+
 ## 🗓 향후 개발 (2차 PT)
 
-- Media Center 템플릿 적용 여부 결정(미디어 앱 라이브러리·Tune Knob·하드키 기본 지원), 실차 하드키 검증
+- Media Center 템플릿 제공 여부 Pleos 문의 후 적용 결정(§8), 실차 하드키·로터리·Gleo 음성 검색 검증
 - 실차/실내비 환경에서 SDK 목적지 매칭 검증, `onDestinationArrived` 활용
 - 주행 상태 제한의 실기기 검증 (UXR 리스너 자동 종료 포함)
 - 이전 버전이 남긴 고아 사진 파일 일괄 정리

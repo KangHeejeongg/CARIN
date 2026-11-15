@@ -1,8 +1,10 @@
 package com.carin.noraebang.karaoke;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -77,27 +79,40 @@ public final class KaraokePanel extends FrameLayout {
         addView(scrim, new LayoutParams(-1, -1));
 
         // 3. 콘텐츠
+        // 세로 창(약 840dp)에서는 헤더 안내 칩·배경 상태 문구를 옮기거나 숨겨 글자가 세로로 쪼개지지 않게 한다.
+        // 창 크기가 바뀌면 Activity가 다시 만들어지므로 생성 시점의 방향만 보면 된다
+        boolean compact = context.getResources().getConfiguration().orientation
+                != Configuration.ORIENTATION_LANDSCAPE;
+
         LinearLayout column = new LinearLayout(context);
         column.setOrientation(LinearLayout.VERTICAL);
-        column.setPadding(dp(48), dp(28), dp(48), dp(32));
+        column.setPadding(dp(compact ? 32 : 48), dp(28), dp(compact ? 32 : 48), dp(32));
         addView(column, new LayoutParams(-1, -1));
 
         // 상단 바: 로고 · 제목 · 안내 · 닫기
         LinearLayout header = new LinearLayout(context);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.addView(new LogoView(context), new LinearLayout.LayoutParams(dp(210), dp(76)));
+        header.addView(new LogoView(context), compact
+                ? new LinearLayout.LayoutParams(dp(150), dp(56))
+                : new LinearLayout.LayoutParams(dp(210), dp(76)));
 
         LinearLayout titles = new LinearLayout(context);
         titles.setOrientation(LinearLayout.VERTICAL);
-        titles.addView(CarinTheme.text(context, "카인 노래방", 28, CarinTheme.GLASS_WHITE, CarinTheme.BOLD));
-        titles.addView(CarinTheme.text(context, "추억이 배경이 되는, 나만의 노래방", 17,
-                CarinTheme.MUTED, CarinTheme.REGULAR));
+        TextView title = CarinTheme.text(context, "카인 노래방", 28, CarinTheme.GLASS_WHITE, CarinTheme.BOLD);
+        title.setSingleLine(true);
+        titles.addView(title);
+        TextView subtitle = CarinTheme.text(context, "추억이 배경이 되는, 나만의 노래방", 17,
+                CarinTheme.MUTED, CarinTheme.REGULAR);
+        subtitle.setSingleLine(true);
+        subtitle.setEllipsize(TextUtils.TruncateAt.END);
+        titles.addView(subtitle);
         LinearLayout.LayoutParams titlesParams = new LinearLayout.LayoutParams(0, -2, 1);
         titlesParams.leftMargin = dp(20);
         header.addView(titles, titlesParams);
 
-        header.addView(CarinTheme.chip(context, DemoLyrics.NOTICE, CarinTheme.AMBER));
+        TextView notice = CarinTheme.chip(context, DemoLyrics.NOTICE, CarinTheme.AMBER);
+        if (!compact) header.addView(notice);
 
         CircleButton close = new CircleButton(context, CarinIcon.Type.CLOSE, CircleButton.Style.GLASS, 28);
         close.setOnClickListener(v -> listener.onClose());
@@ -112,6 +127,15 @@ public final class KaraokePanel extends FrameLayout {
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
         titleParams.topMargin = dp(20);
         column.addView(songTitleText, titleParams);
+        if (compact) {
+            // 세로 창: 데모 가사 안내는 헤더 대신 곡 제목 아래 가운데에
+            LinearLayout noticeRow = new LinearLayout(context);
+            noticeRow.setGravity(Gravity.CENTER);
+            noticeRow.addView(notice);
+            LinearLayout.LayoutParams noticeParams = new LinearLayout.LayoutParams(-1, -2);
+            noticeParams.topMargin = dp(12);
+            column.addView(noticeRow, noticeParams);
+        }
 
         // 가사: 이전 줄(흐림) · 현재 줄(코랄 강조) · 다음 줄
         FrameLayout lyricsArea = new FrameLayout(context);
@@ -119,9 +143,9 @@ public final class KaraokePanel extends FrameLayout {
         lyrics.setOrientation(LinearLayout.VERTICAL);
         lyrics.setGravity(Gravity.CENTER);
         previousLine = lyricLine(context, 26, CarinTheme.withAlpha(CarinTheme.GLASS_WHITE, 0x73), CarinTheme.REGULAR);
-        currentLine = lyricLine(context, 56, CarinTheme.CORAL, CarinTheme.BOLD);
+        currentLine = lyricLine(context, compact ? 46 : 56, CarinTheme.CORAL, CarinTheme.BOLD);
         currentLine.setShadowLayer(dp(18), 0, 0, 0x99FF7F88);
-        nextLine = lyricLine(context, 38, CarinTheme.GLASS_WHITE, CarinTheme.MEDIUM);
+        nextLine = lyricLine(context, compact ? 32 : 38, CarinTheme.GLASS_WHITE, CarinTheme.MEDIUM);
         nextLine.setShadowLayer(dp(8), 0, 0, 0xAA000000);
         lineCounter = lyricLine(context, 15, CarinTheme.MUTED, CarinTheme.REGULAR);
         lyrics.addView(previousLine);
@@ -173,6 +197,10 @@ public final class KaraokePanel extends FrameLayout {
         photoStateText = CarinTheme.text(context, "배경: 기본", 15, CarinTheme.MUTED, CarinTheme.REGULAR);
         LinearLayout.LayoutParams stateParams = new LinearLayout.LayoutParams(-2, -2);
         stateParams.leftMargin = dp(14);
+        photoStateText.setSingleLine(true);
+        photoStateText.setEllipsize(TextUtils.TruncateAt.END);
+        // 세로 창에서는 버튼 사이에 공간이 없어 글자가 세로로 쪼개지므로 숨긴다 (배경은 화면으로 바로 보임)
+        if (compact) photoStateText.setVisibility(GONE);
         leftGroup.addView(photoStateText, stateParams);
         controls.addView(leftGroup, new LinearLayout.LayoutParams(0, -2, 1));
 

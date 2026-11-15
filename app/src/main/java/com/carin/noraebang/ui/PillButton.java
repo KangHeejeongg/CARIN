@@ -92,8 +92,9 @@ public class PillButton extends LinearLayout {
                 bg.setCornerRadius(CarinTheme.dp(c, 999));
                 setBackground(bg);
                 CarinTheme.glow(this, CarinTheme.CORAL, 10);
-                textColor = Color.WHITE;
-                iconColor = Color.WHITE;
+                // 코랄 위 흰 글자는 대비 2.3:1 → 딥 바이닐로 4.5:1 이상 확보 (Pleos UI 가이드)
+                textColor = CarinTheme.DEEP_VINYL;
+                iconColor = CarinTheme.DEEP_VINYL;
                 break;
             case TAB:
                 if (tabSelected) {

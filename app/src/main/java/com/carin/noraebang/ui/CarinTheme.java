@@ -27,7 +27,8 @@ public final class CarinTheme {
     public static final int CORAL = 0xFFFF7F88;
     public static final int CORAL_DEEP = 0xFFF2646F;
     public static final int MUTED = 0xFFB9ADB4;
-    public static final int FAINT = 0xFF877C84;
+    /** 보조 문구. 가장 밝은 표면(SURFACE)에서도 대비 4.5:1 이상 (Pleos UI 가이드) */
+    public static final int FAINT = 0xFFA79CA4;
     public static final int AMBER = 0xFFFFC98A;
     public static final int STROKE = 0x29FFFFFF;
     public static final int GLASS_FILL = 0xB82B2B31;

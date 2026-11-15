@@ -9,6 +9,7 @@ import android.content.res.Configuration;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
@@ -370,8 +371,10 @@ public class MainActivity extends Activity {
 
         // 왼쪽 글자가 잘 읽히도록 왼쪽→오른쪽으로 옅어지는 스크림
         View scrim = new View(this);
-        scrim.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[] {0xF21A191E, 0xB31A191E, 0x331A191E, 0x001A191E}));
+        // 세로 창에서는 글이 카드 전체 너비에 걸치므로 오른쪽까지 충분히 어둡게 한다
+        scrim.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, landscape
+                ? new int[] {0xF21A191E, 0xB31A191E, 0x331A191E, 0x001A191E}
+                : new int[] {0xF21A191E, 0xD91A191E, 0xA61A191E, 0x731A191E}));
         heroCard.addView(scrim, new FrameLayout.LayoutParams(-1, -1));
 
         heroRoute = new RouteLineView(this);
@@ -379,6 +382,8 @@ public class MainActivity extends Activity {
                 Gravity.END | Gravity.BOTTOM);
         routeParams.setMargins(0, 0, dp(32), dp(40));
         heroCard.addView(heroRoute, routeParams);
+        // 세로 창(약 840dp)에서는 글이 카드 전체 너비를 쓰므로 장식용 경로선이 버튼과 겹친다 → 숨김
+        if (!landscape) heroRoute.setVisibility(View.GONE);
 
         LinearLayout split = new LinearLayout(this);
         split.setOrientation(LinearLayout.HORIZONTAL);
@@ -387,9 +392,15 @@ public class MainActivity extends Activity {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setGravity(Gravity.CENTER_VERTICAL);
-        content.setPadding(dp(52), dp(36), dp(24), dp(36));
-        split.addView(content, new LinearLayout.LayoutParams(0, -1, 1.15f));
-        split.addView(new View(this), new LinearLayout.LayoutParams(0, -1, 1f));
+        if (landscape) {
+            content.setPadding(dp(52), dp(36), dp(24), dp(36));
+            split.addView(content, new LinearLayout.LayoutParams(0, -1, 1.15f));
+            split.addView(new View(this), new LinearLayout.LayoutParams(0, -1, 1f));
+        } else {
+            // 세로 창에서 반쪽 너비만 쓰면 제목이 단어 중간에서 끊기고 버튼이 잘린다
+            content.setPadding(dp(40), dp(32), dp(40), dp(32));
+            split.addView(content, new LinearLayout.LayoutParams(-1, -1));
+        }
 
         LinearLayout chipRow = new LinearLayout(this);
         heroChip = CarinTheme.chip(this, "MEMORY ROUTE", ACCENT);
@@ -662,6 +673,9 @@ public class MainActivity extends Activity {
         songTitle.setSingleLine(true);
         info.addView(songTitle);
         songCount = text("카인 플레이리스트", 16, MUTED, CarinTheme.REGULAR);
+        // 좁은 창에서 "1 / 3"만 다음 줄로 떨어지지 않도록 한 줄로 줄인다
+        songCount.setSingleLine(true);
+        songCount.setEllipsize(TextUtils.TruncateAt.END);
         info.addView(songCount, below(-1, -2, 4));
         miniProgress = new ProgressLine(this, false);
         info.addView(miniProgress, below(-1, dp(10), 10));
@@ -844,10 +858,10 @@ public class MainActivity extends Activity {
 
             int total = player.getMediaItemCount();
 
-            songCount.setText(
-                    "카인 플레이리스트 · "
-                            + index + " / " + total
-            );
+            // 세로 창에서는 공간이 좁아 순번만 보여 준다
+            songCount.setText(landscape
+                    ? "카인 플레이리스트 · " + index + " / " + total
+                    : "재생 순서 " + index + " / " + total);
 
             playlistInfo.setText(
                     "카인 플레이리스트 · "
@@ -1366,7 +1380,8 @@ public class MainActivity extends Activity {
             closeKaraoke();
             return;
         }
-        super.onBackPressed();
+        // Pleos CCP 가이드: 음악 앱은 Back에서 종료(Finish)하지 않고 숨긴다(Hide). 재생도 그대로 둔다
+        if (!moveTaskToBack(true)) super.onBackPressed();
     }
 
     @Override

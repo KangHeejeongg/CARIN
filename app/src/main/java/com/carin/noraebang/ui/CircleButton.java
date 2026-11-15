@@ -23,7 +23,8 @@ public final class CircleButton extends FrameLayout {
         setClickable(true);
         setFocusable(true);
 
-        icon = new CarinIcon(type, style == Style.PRIMARY ? Color.WHITE : CarinTheme.GLASS_WHITE);
+        // 코랄 배경 위 흰색은 대비 2.3:1이라 Pleos 기준(4.5:1)에 못 미친다 → 딥 바이닐(7.2:1)
+        icon = new CarinIcon(type, style == Style.PRIMARY ? CarinTheme.DEEP_VINYL : CarinTheme.GLASS_WHITE);
         ImageView iconView = new ImageView(context);
         iconView.setImageDrawable(icon);
         int size = CarinTheme.dp(context, iconDp);
