@@ -7,8 +7,8 @@
 
 | 항목 | 값 |
 |---|---|
-| APK | `apk/CARIN_CAR_IN_release.apk` |
-| 설치 | `adb install -r apk/CARIN_CAR_IN_release.apk` |
+| APK | `apk/강희정_CARIN_release.apk` |
+| 설치 | `adb install -r apk/강희정_CARIN_release.apk` |
 | 실행 | 런처의 **CAR IN** 아이콘 또는 `adb shell am start -n com.carin.noraebang/.MainActivity` |
 | 권장 환경 | Pleos Connect Emulator v2.1.0 (Android 14, 2560×1440), 주차(P) 상태 |
 

@@ -107,7 +107,7 @@
 | `assembleDebug` / `testDebugUnitTest` | ✅ / ✅ (19 tests: PlaceMatcher 3 · MemoryCodec 6 · PhotoRetention 7 · PhotoSizing 2 · 템플릿 1) |
 | `assembleRelease` (R8, v2 서명) | ✅ |
 | Release 설치·실행 (에뮬레이터, 기존 데이터 유지 업데이트) | ✅ |
-| `apk/CARIN_CAR_IN_release.apk` (백그라운드 재생·JPEG 배경·UXR 실시간 감시·사진 정리·데모 추억·사용법 안내 포함, 15.9MB, 2026-11-15) | ✅ |
+| `apk/강희정_CARIN_release.apk` (백그라운드 재생·JPEG 배경·UXR 실시간 감시·사진 정리·데모 추억·사용법 안내 포함, 15.9MB, 2026-11-15) | ✅ |
 | 배경 PNG → JPEG 변환 (APK 23.7MB → 15.5MB) | ✅ |
 
 ## 7-1. 첫 사용 경험 · 화면 정리 (2026-11-15)
