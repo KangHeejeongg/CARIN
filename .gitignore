@@ -23,9 +23,11 @@ keystore.properties
 /.idea/deploymentTargetSelector.xml
 
 /.idea/
-/app/release/          # Android Studio "Generate Signed APK"의 출력 폴더
+# Android Studio "Generate Signed APK"의 출력 폴더
+/app/release/
 /app/debug/
-*.hprof                # 메모리 덤프
+# 메모리 덤프
+*.hprof
 .kotlin/
 .claude/settings.local.json
 CLAUDE.md
