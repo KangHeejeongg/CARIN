@@ -48,9 +48,20 @@ public final class MemoryStore {
     /** 교체되어 지울 후보가 된 사진 URI (보관본이 더 이상 참조하지 않을 때 삭제) */
     private static final String KEY_PENDING_RELEASE = "photos_pending_release";
 
-    public static final String DEMO_PLACE = "강릉";
-    public static final String DEMO_TITLE = "우리의 강릉 여행 (데모)";
-    public static final String DEMO_DATE = "2025-08-15";
+    /** 첫 실행 때 데모 추억을 한 번 넣었는지 (사용자가 지운 데모를 다시 만들지 않기 위함) */
+    private static final String KEY_DEMO_SEEDED = "demo_seeded";
+    /** 앱에 번들된 사진 URI 접두사 (ImageLoader가 AssetManager로 연다) */
+    private static final String ASSET_URI = "file:///android_asset/";
+
+    /**
+     * 데모 추억 정의: id, 장소, 제목, 여행 날짜, 사진(assets 경로).
+     * 곡은 카탈로그 순서대로 하나씩 연결한다. 장소는 데모 목적지(강릉역·속초해수욕장·평창역)와 매칭된다.
+     */
+    private static final String[][] DEMOS = {
+            {"demo-gangneung", "강릉", "우리의 강릉 여행 (데모)", "2025-08-15", "backgrounds/memory.jpg"},
+            {"demo-sokcho", "속초", "속초 바닷길 노을 드라이브 (데모)", "2025-06-07", "backgrounds/default.jpg"},
+            {"demo-pyeongchang", "평창", "평창의 크리스마스 (데모)", "2024-12-24", "demo/pyeongchang.jpg"},
+    };
 
     private final Context appContext;
     private final SharedPreferences prefs;
@@ -214,23 +225,59 @@ public final class MemoryStore {
     }
 
     /**
-     * 강릉 데모 기록 1건을 생성한다.
-     * 재생 가능한 곡이 없거나 이미 데모가 있으면 null을 반환한다.
+     * 아직 없는 데모 추억(강릉·속초·평창, 사진 포함)을 한 번의 저장으로 만든다.
+     *
+     * @return 새로 만든 데모 개수. 곡이 없거나 모두 이미 있거나 쓰기 보호 상태면 0
      */
-    public Memory createDemo() {
-        if (hasDemo()) return null;
+    public int createDemos() {
         List<SongCatalog.Song> songs = SongCatalog.all();
-        if (songs.isEmpty()) return null;
-        Memory demo = new Memory(
-                "demo-gangneung",
-                DEMO_PLACE,
-                DEMO_TITLE,
-                DEMO_DATE,
-                songs.get(0).id,
-                System.currentTimeMillis(),
-                true
-        );
-        return add(demo) ? demo : null;
+        if (songs.isEmpty()) return 0;
+        List<Memory> existing = getAll();
+        List<Memory> toAdd = new ArrayList<>();
+        long now = System.currentTimeMillis();
+        for (int i = 0; i < DEMOS.length; i++) {
+            String[] d = DEMOS[i];
+            boolean present = false;
+            for (Memory memory : existing) {
+                if (memory.id.equals(d[0])) present = true;
+            }
+            if (present) continue;
+            String songId = songs.get(Math.min(i, songs.size() - 1)).id;
+            toAdd.add(new Memory(d[0], d[1], d[2], d[3], songId, now + i, true, ASSET_URI + d[4]));
+        }
+        if (toAdd.isEmpty()) return 0;
+        return write(list -> list.addAll(toAdd)) ? toAdd.size() : 0;
+    }
+
+    /**
+     * 데모 추억을 모두 지운다 (한 번의 저장). 데모 사진은 앱에 번들된 파일이라 지울 파일이 없다.
+     *
+     * @return 실제로 지웠으면 true
+     */
+    public boolean deleteDemos() {
+        return write(list -> {
+            boolean removed = false;
+            for (int i = list.size() - 1; i >= 0; i--) {
+                if (list.get(i).demo) {
+                    list.remove(i);
+                    removed = true;
+                }
+            }
+            return removed;
+        });
+    }
+
+    /**
+     * 첫 실행이면 데모 추억을 넣어 처음부터 추억 목록과 Memory Route를 체험할 수 있게 한다.
+     * 이미 기록이 있거나 한 번 시도했으면 아무것도 하지 않는다.
+     *
+     * @return 데모를 새로 넣었으면 true
+     */
+    public boolean seedDemosOnce() {
+        if (prefs.getBoolean(KEY_DEMO_SEEDED, false) || isWriteProtected()) return false;
+        boolean seeded = getAll().isEmpty() && createDemos() > 0;
+        prefs.edit().putBoolean(KEY_DEMO_SEEDED, true).apply();
+        return seeded;
     }
 
     /** 목적지 이름/주소와 일치하는 추억을 최신순으로 반환 */

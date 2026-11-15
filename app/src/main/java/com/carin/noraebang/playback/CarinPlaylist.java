@@ -2,15 +2,21 @@ package com.carin.noraebang.playback;
 
 import android.content.Context;
 import android.net.Uri;
+import android.util.Log;
 
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
 
 import com.carin.noraebang.memory.SongCatalog;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * 재생 서비스와 차량 미디어 시스템에 제공하는 곡·탐색 구조.
@@ -83,12 +89,41 @@ public final class CarinPlaylist {
         return result;
     }
 
+    /** 곡 커버 바이트 캐시 (assets에서 한 번만 읽는다) */
+    private static final Map<String, byte[]> COVER_CACHE = new HashMap<>();
+
+    /**
+     * 곡 커버 JPEG 바이트를 읽는다. 없으면 null (차량 미디어 화면은 기본 아이콘을 쓴다).
+     *
+     * @param context 아무 Context
+     * @param song    대상 곡
+     * @return JPEG 바이트 또는 null
+     */
+    private static synchronized byte[] coverBytes(Context context, SongCatalog.Song song) {
+        if (COVER_CACHE.containsKey(song.id)) return COVER_CACHE.get(song.id);
+        byte[] bytes = null;
+        try (InputStream in = context.getAssets().open(song.coverAsset);
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[16 * 1024];
+            int read;
+            while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
+            bytes = out.toByteArray();
+        } catch (IOException e) {
+            Log.w("CARIN_PLAYBACK", "커버 없음: " + song.coverAsset);
+        }
+        COVER_CACHE.put(song.id, bytes);
+        return bytes;
+    }
+
     private static MediaItem song(Context context, SongCatalog.Song song, int track, int total) {
         Uri uri = Uri.parse("android.resource://" + context.getPackageName() + "/" + song.rawResId);
+        MediaMetadata.Builder metadata = new MediaMetadata.Builder();
+        byte[] cover = coverBytes(context, song);
+        if (cover != null) metadata.setArtworkData(cover, MediaMetadata.PICTURE_TYPE_FRONT_COVER);
         return new MediaItem.Builder()
                 .setMediaId(song.id)
                 .setUri(uri)
-                .setMediaMetadata(new MediaMetadata.Builder()
+                .setMediaMetadata(metadata
                         .setTitle(song.title)
                         .setDisplayTitle(song.title)
                         // 차량 목록·위젯의 두 번째 줄(MediaDescription subtitle)에 표시

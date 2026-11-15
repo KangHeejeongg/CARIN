@@ -31,14 +31,17 @@ public final class MemoryListPage extends LinearLayout {
         /** 등록 다이얼로그 열기 */
         void onRegister();
 
-        /** 강릉 데모 기록 만들기 */
-        void onCreateDemo();
+        /** 데모 추억(강릉·속초·평창)을 넣거나, 이미 있으면 지운다 */
+        void onToggleDemo(boolean demosPresent);
     }
 
     private final Listener listener;
     private final int columns;
     private final LinearLayout grid;
     private final TextView countChip;
+    /** 데모 추억 넣기/지우기 (현재 목록에 데모가 있는지에 따라 문구가 바뀐다) */
+    private final PillButton demoButton;
+    private boolean demosPresent = false;
     /** 저장 데이터 손상 시 보호 상태를 알리는 칩 (정상일 때 숨김) */
     private final TextView storageChip;
     /** 저장 원문이 손상되어 변경이 차단된 상태 (빈 화면 문구를 바꾸는 데 사용) */
@@ -77,10 +80,10 @@ public final class MemoryListPage extends LinearLayout {
                 18, CarinTheme.MUTED, CarinTheme.REGULAR), subParams);
         header.addView(titles, new LayoutParams(0, -2, 1));
 
-        PillButton demo = new PillButton(context, "데모 데이터", CarinIcon.Type.SPARKLE, PillButton.Style.GHOST);
-        demo.setOnClickListener(v -> listener.onCreateDemo());
-        header.addView(demo, buttonParams());
-        PillButton register = new PillButton(context, "추억 등록", CarinIcon.Type.PLUS, PillButton.Style.PRIMARY);
+        demoButton = new PillButton(context, "데모 추억 넣기", CarinIcon.Type.SPARKLE, PillButton.Style.GHOST);
+        demoButton.setOnClickListener(v -> listener.onToggleDemo(demosPresent));
+        header.addView(demoButton, buttonParams());
+        PillButton register = new PillButton(context, "추억 남기기", CarinIcon.Type.PLUS, PillButton.Style.PRIMARY);
         register.setOnClickListener(v -> listener.onRegister());
         header.addView(register, buttonParams());
         addView(header);
@@ -115,6 +118,12 @@ public final class MemoryListPage extends LinearLayout {
     public void setMemories(List<Memory> memories) {
         grid.removeAllViews();
         countChip.setText(memories.size() + "개");
+        demosPresent = false;
+        for (Memory memory : memories) {
+            if (memory.demo) demosPresent = true;
+        }
+        demoButton.setText(demosPresent ? "데모 추억 지우기" : "데모 추억 넣기");
+        demoButton.setIcon(demosPresent ? CarinIcon.Type.TRASH : CarinIcon.Type.SPARKLE);
 
         if (memories.isEmpty()) {
             grid.addView(emptyState());
@@ -249,7 +258,7 @@ public final class MemoryListPage extends LinearLayout {
 
         if (writeProtected) return box;   // 등록해도 저장되지 않으므로 등록 버튼을 보이지 않는다
 
-        PillButton register = new PillButton(c, "첫 추억 등록하기", CarinIcon.Type.PLUS, PillButton.Style.PRIMARY);
+        PillButton register = new PillButton(c, "첫 추억 남기기", CarinIcon.Type.PLUS, PillButton.Style.PRIMARY);
         register.setOnClickListener(v -> listener.onRegister());
         LayoutParams registerParams = new LayoutParams(-2, dp(64));
         registerParams.topMargin = dp(28);

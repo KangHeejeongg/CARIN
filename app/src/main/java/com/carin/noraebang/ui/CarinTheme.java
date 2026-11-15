@@ -8,6 +8,8 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.graphics.drawable.StateListDrawable;
+import android.graphics.text.LineBreakConfig;
+import android.os.Build;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -81,6 +83,10 @@ public final class CarinTheme {
         view.setTextColor(color);
         view.setTypeface(typeface(weight));
         view.setLineSpacing(0, 1.12f);
+        // 한국어가 "흘러나옵/니다"처럼 어절 중간에서 끊기지 않도록 어절(구) 단위 줄바꿈 (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            view.setLineBreakWordStyle(LineBreakConfig.LINE_BREAK_WORD_STYLE_PHRASE);
+        }
         return view;
     }
 

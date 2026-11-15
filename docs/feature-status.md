@@ -107,8 +107,20 @@
 | `assembleDebug` / `testDebugUnitTest` | ✅ / ✅ (19 tests: PlaceMatcher 3 · MemoryCodec 6 · PhotoRetention 7 · PhotoSizing 2 · 템플릿 1) |
 | `assembleRelease` (R8, v2 서명) | ✅ |
 | Release 설치·실행 (에뮬레이터, 기존 데이터 유지 업데이트) | ✅ |
-| `apk/CARIN_CAR_IN_release.apk` (백그라운드 재생·JPEG 배경·UXR 실시간 감시·사진 정리 포함, 15.5MB, 2026-11-15) | ✅ |
+| `apk/CARIN_CAR_IN_release.apk` (백그라운드 재생·JPEG 배경·UXR 실시간 감시·사진 정리·데모 추억·사용법 안내 포함, 15.9MB, 2026-11-15) | ✅ |
 | 배경 PNG → JPEG 변환 (APK 23.7MB → 15.5MB) | ✅ |
+
+## 7-1. 첫 사용 경험 · 화면 정리 (2026-11-15)
+
+| 항목 | 상태 | 비고 |
+|---|---|---|
+| 첫 실행 데모 추억 3개 (강릉·속초·평창, 사진 포함) | ✅ | `MemoryStore.seedDemosOnce()`. 기록이 없을 때 한 번만. 사진은 assets 번들(`file:///android_asset/...`) |
+| 데모 추억 넣기/지우기 토글 | ✅ | 카인 추억 탭. 지우기는 주차 확인 + 확인 창, 직접 남긴 추억은 유지 |
+| 첫 실행 사용법 3장 + "강릉역으로 체험하기" | ✅ | `OnboardingPanel`. 주차 중에만 표시, 헤더 **사용법**으로 다시 보기 |
+| 곡 가제·한 줄 소개·커버 | ✅ | `SongCatalog` (바다 빛 드라이브 / 초록 신호의 밤 / 터널 끝의 하늘). 커버는 차량 미디어 메타데이터에도 전달 |
+| 메인 화면 단순화 | ✅ | Memory Route 패널·개발 정보는 debug 빌드에서만. 목적지는 헤더 칩·히어로의 **목적지 고르기** 창 하나로 |
+| 주행 상태 칩 | ✅ | 주차 중에는 숨기고 주행 중·확인 불가일 때만 표시 |
+| 한국어 어절 단위 줄바꿈 | ✅ | Android 13+ `LINE_BREAK_WORD_STYLE_PHRASE` |
 
 ## 8. Pleos 가이드 점검 (2026-11-15)
 

@@ -17,12 +17,19 @@ public final class SongCatalog {
     public static final class Song {
         public final String id;
         public final int rawResId;
+        /** 곡 제목 (팀 자체 제작 음원의 가제. 정식 제목이 정해지면 여기만 바꾼다) */
         public final String title;
+        /** 목록에 함께 보여 줄 한 줄 소개 */
+        public final String mood;
+        /** 커버 이미지 (assets 기준 경로) */
+        public final String coverAsset;
 
-        Song(String id, int rawResId, String title) {
+        Song(String id, int rawResId, String title, String mood) {
             this.id = id;
             this.rawResId = rawResId;
             this.title = title;
+            this.mood = mood;
+            this.coverAsset = "covers/" + id + ".jpg";
         }
     }
 
@@ -30,9 +37,13 @@ public final class SongCatalog {
 
     static {
         List<Song> list = new ArrayList<>();
-        list.add(new Song("carin_song_01", R.raw.carin_song_01, "첫 번째 노래"));
-        list.add(new Song("carin_song_02", R.raw.carin_song_02, "두 번째 노래"));
-        list.add(new Song("carin_song_03", R.raw.carin_song_03, "세 번째 노래"));
+        // 제목은 각 곡의 데모 가사(DemoLyrics)에 맞춘 가제
+        list.add(new Song("carin_song_01", R.raw.carin_song_01, "바다 빛 드라이브",
+                "창문 너머 바다를 따라 달리는 여름 노래"));
+        list.add(new Song("carin_song_02", R.raw.carin_song_02, "초록 신호의 밤",
+                "지도 없이 떠나는 밤 드라이브"));
+        list.add(new Song("carin_song_03", R.raw.carin_song_03, "터널 끝의 하늘",
+                "비 갠 길 위에서 다시 만나는 그날"));
         SONGS = Collections.unmodifiableList(list);
     }
 

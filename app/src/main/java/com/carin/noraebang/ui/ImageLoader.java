@@ -86,8 +86,27 @@ public final class ImageLoader {
         });
     }
 
+    /** 앱에 번들된 사진(데모 추억·곡 커버)을 가리키는 URI 접두사 */
+    public static final String ASSET_URI_PREFIX = "file:///android_asset/";
+
+    /**
+     * assets 안의 파일을 가리키는 URI를 만든다.
+     *
+     * @param path assets 기준 경로 (예: demo/gangneung.jpg)
+     * @return file:///android_asset/{path}
+     */
+    public static Uri assetUri(String path) {
+        return Uri.parse(ASSET_URI_PREFIX + path);
+    }
+
     private static Bitmap decodeUri(Context context, Uri uri, int maxSide) {
         try {
+            String value = uri.toString();
+            if (value.startsWith(ASSET_URI_PREFIX)) {
+                // ContentResolver는 android_asset을 열지 못하므로 AssetManager로 직접 연다
+                String path = value.substring(ASSET_URI_PREFIX.length());
+                return decode(() -> context.getAssets().open(path), maxSide);
+            }
             return decode(() -> context.getContentResolver().openInputStream(uri), maxSide);
         } catch (Exception e) {
             Log.w(TAG, "사진 로딩 실패: " + uri, e);
