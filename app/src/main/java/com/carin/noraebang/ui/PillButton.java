@@ -53,8 +53,16 @@ public class PillButton extends LinearLayout {
         label.setText(text);
     }
 
-    /** 아이콘을 바꾼다 */
+    /**
+     * 아이콘을 바꾼다.
+     *
+     * @param type 새 아이콘. null이면 아이콘을 숨긴다
+     */
     public void setIcon(CarinIcon.Type type) {
+        if (type == null) {
+            iconView.setVisibility(GONE);
+            return;
+        }
         icon.setType(type);
         iconView.setVisibility(VISIBLE);
     }

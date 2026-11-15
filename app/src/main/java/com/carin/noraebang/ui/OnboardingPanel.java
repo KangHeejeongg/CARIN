@@ -102,7 +102,7 @@ public final class OnboardingPanel extends FrameLayout {
         skipButton = new PillButton(context, "건너뛰기", null, PillButton.Style.GHOST);
         skipButton.setOnClickListener(v -> finish(false));
         buttons.addView(skipButton, new LinearLayout.LayoutParams(-2, dp(64)));
-        nextButton = new PillButton(context, "다음", CarinIcon.Type.NEXT, PillButton.Style.PRIMARY);
+        nextButton = new PillButton(context, "다음", null, PillButton.Style.PRIMARY);
         nextButton.setOnClickListener(v -> {
             if (step < STEPS.length - 1) show(step + 1);
             else finish(true);
@@ -141,7 +141,7 @@ public final class OnboardingPanel extends FrameLayout {
         body.setText(s[2]);
         boolean last = index == STEPS.length - 1;
         nextButton.setText(last ? "강릉역으로 체험하기" : "다음");
-        nextButton.setIcon(last ? CarinIcon.Type.PIN : CarinIcon.Type.NEXT);
+        nextButton.setIcon(last ? CarinIcon.Type.PIN : null);
         skipButton.setText(last ? "닫기" : "건너뛰기");
 
         dots.removeAllViews();

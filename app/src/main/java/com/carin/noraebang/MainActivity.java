@@ -491,7 +491,8 @@ public class MainActivity extends Activity {
             return;
         }
 
-        setHeroChip(sourceLabel(), destinationSource == DestinationSource.DEMO ? WARN : ACCENT);
+        // 목적지 출처((SDK)/[DEMO])는 헤더 칩에 항상 표시되므로 히어로에서는 반복하지 않는다
+        setHeroChip("MEMORY ROUTE", ACCENT);
 
         if (memory == null) {
             heroTitle.setText("'" + destinationName + "'과(와) 연결된 추억이 없어요.");

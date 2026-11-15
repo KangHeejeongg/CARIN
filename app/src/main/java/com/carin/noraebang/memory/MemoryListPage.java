@@ -181,6 +181,9 @@ public final class MemoryListPage extends LinearLayout {
 
         if (memory.demo) {
             TextView demo = CarinTheme.chip(c, "데모 데이터", CarinTheme.AMBER);
+            // 밝은 사진 위에서도 읽히도록 어두운 바탕을 깐다 (대비 4.5:1 이상)
+            demo.setBackground(CarinTheme.roundedStroke(c, 0xD91A191E,
+                    CarinTheme.withAlpha(CarinTheme.AMBER, 0x99), 1, 999));
             FrameLayout.LayoutParams demoParams = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
             demoParams.setMargins(0, dp(16), dp(16), 0);
             photo.addView(demo, demoParams);
