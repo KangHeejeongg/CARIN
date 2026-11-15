@@ -32,8 +32,9 @@ public final class MemoryRegisterDialog {
      * 등록 다이얼로그를 표시한다.
      *
      * @param defaultPlace 미리 채울 장소 (현재 목적지 등). null 가능
+     * @return 표시한 다이얼로그 (주행 상태로 바뀌면 호출 측이 닫을 수 있도록)
      */
-    public static void show(Activity activity, MemoryStore store,
+    public static CarinDialog show(Activity activity, MemoryStore store,
                             String defaultPlace, OnSaved onSaved) {
 
         CarinDialog dialog = new CarinDialog(activity, "추억 등록",
@@ -132,6 +133,7 @@ public final class MemoryRegisterDialog {
             }
         });
         dialog.show();
+        return dialog;
     }
 
     private static TextView label(Activity activity, String text, boolean topGap) {

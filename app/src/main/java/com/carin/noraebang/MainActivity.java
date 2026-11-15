@@ -173,6 +173,8 @@ public class MainActivity extends Activity {
     /** 추억 상세에서 노래방에 들어왔을 때 이 세션 동안 고정할 추억 (null이면 곡에 따라 자동 선택) */
     private Memory karaokeSessionMemory;
     private CarinDialog detailDialog;
+    /** 주차 중에만 허용되는 다이얼로그(추억 등록 입력, 삭제 확인). 주행으로 바뀌면 닫는다 */
+    private CarinDialog restrictedDialog;
     /** 추억 상세에서 사진 선택을 시작했을 때 결과를 연결할 추억 ID */
     private String pendingPhotoMemoryId = null;
     /** debug 빌드 검증용: true면 사진 연결 저장을 실패로 처리한다 (release는 설정 경로 없음) */
@@ -792,6 +794,8 @@ public class MainActivity extends Activity {
         super.onStart();
         connectPlayer();
         uiHandler.post(progressTicker);
+        // 화면이 보이는 동안 주행 상태 변경을 실시간으로 받아 노래방·입력 화면을 닫는다
+        safetyGuard.startMonitoring(this::onDrivingStateChanged);
     }
 
     /** 재생 서비스에 MediaController로 연결한다 (연결만으로는 재생하지 않는다) */
@@ -871,6 +875,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onStop() {
         uiHandler.removeCallbacks(progressTicker);
+        // 백그라운드에서는 감시를 멈춘다. 복귀 시 onStart에서 다시 등록하고 onResume에서 재확인한다
+        safetyGuard.stopMonitoring();
         // 화면 연결만 해제한다. 플레이어는 서비스가 소유하므로 재생은 계속된다
         if (player != null) {
             player.removeListener(playerListener);
@@ -1165,7 +1171,7 @@ public class MainActivity extends Activity {
         String defaultPlace = destinationSource == DestinationSource.NONE
                 ? null : destinationName;
 
-        MemoryRegisterDialog.show(this, memoryStore, defaultPlace,
+        restrictedDialog = MemoryRegisterDialog.show(this, memoryStore, defaultPlace,
                 memory -> {
                     // 저장으로 직전 원문이 바뀌었으므로 더 이상 참조되지 않는 대기 사진을 정리
                     sweepReleasedPhotos();
@@ -1235,6 +1241,8 @@ public class MainActivity extends Activity {
         confirm.addButton("취소", null, PillButton.Style.GHOST, confirm::dismiss);
         confirm.addButton("삭제", CarinIcon.Type.TRASH, PillButton.Style.PRIMARY, () -> {
             confirm.dismiss();
+            // 확인 창을 띄운 뒤 주행을 시작했을 수 있으므로 실제 삭제 직전에 다시 확인
+            if (!ensureParkedForRestrictedFeature()) return;
             if (memoryStore.delete(memory.id)) {
                 Toast.makeText(this, "삭제되었습니다", Toast.LENGTH_SHORT).show();
                 sweepReleasedPhotos();
@@ -1244,6 +1252,7 @@ public class MainActivity extends Activity {
                 Toast.makeText(this, "삭제에 실패했습니다", Toast.LENGTH_SHORT).show();
             }
         });
+        restrictedDialog = confirm;
         confirm.show();
     }
 
@@ -1398,9 +1407,14 @@ public class MainActivity extends Activity {
      * debug 빌드에서만 실패 주입 플래그를 읽는다. 예)
      * adb shell am start -n com.carin.noraebang/.MainActivity --ez carin_debug_fail_photo_save true
      * adb shell am start -n com.carin.noraebang/.MainActivity --ez carin_debug_fail_photo_write true
+     * 주행 상태 변경 재현(실행 중인 화면에 전달해야 하므로 --activity-single-top 필요):
+     * adb shell am start --activity-single-top -n com.carin.noraebang/.MainActivity --ez carin_debug_simulate_driving true
      */
     private void readDebugFaults(Intent intent) {
         if (intent == null || (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) return;
+        if (intent.hasExtra("carin_debug_simulate_driving")) {
+            safetyGuard.simulateForDebug(intent.getBooleanExtra("carin_debug_simulate_driving", false));
+        }
         if (!intent.hasExtra("carin_debug_fail_photo_save")
                 && !intent.hasExtra("carin_debug_fail_photo_write")) return;
         if (intent.hasExtra("carin_debug_fail_photo_save")) {
@@ -1597,6 +1611,31 @@ public class MainActivity extends Activity {
         return false;
     }
 
+    /**
+     * 주행 상태 변경 리스너 (메인 스레드). 주차가 아니게 되면 주차 전용 화면을 즉시 닫는다.
+     * 음악 재생은 제한하지 않으므로 플레이어는 건드리지 않는다.
+     *
+     * @param result 바뀐 뒤의 주행 상태
+     */
+    private void onDrivingStateChanged(DrivingSafetyGuard.Result result) {
+        if (activityDestroyed) return;
+        updateSafetyText(result);
+        if (result.isParkedSafe()) return;
+
+        boolean closed = false;
+        if (isKaraokeOpen()) {
+            closeKaraoke();
+            closed = true;
+        }
+        if (restrictedDialog != null) {
+            restrictedDialog.dismiss();
+            restrictedDialog = null;
+            closed = true;
+        }
+        Log.i("CARIN_SAFETY", "주행 상태 변경: " + result.state + (closed ? " → 주차 전용 화면 닫음" : ""));
+        if (closed) Toast.makeText(this, result.detail, Toast.LENGTH_LONG).show();
+    }
+
     /** 헤더의 주행 상태 칩 갱신 */
     private void updateSafetyText(DrivingSafetyGuard.Result result) {
         String label;
@@ -1706,6 +1745,7 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         activityDestroyed = true;
         uiHandler.removeCallbacksAndMessages(null);
+        safetyGuard.stopMonitoring();
         if (naviClient != null) {
             naviClient.release();
             naviClient = null;
