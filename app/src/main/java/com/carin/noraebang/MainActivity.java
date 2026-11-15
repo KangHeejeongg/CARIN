@@ -1245,6 +1245,9 @@ public class MainActivity extends Activity {
             if (!ensureParkedForRestrictedFeature()) return;
             if (memoryStore.delete(memory.id)) {
                 Toast.makeText(this, "삭제되었습니다", Toast.LENGTH_SHORT).show();
+                // 지운 추억의 사진도 삭제 대기에 넣는다. 직전 원문(memories_prev)이 아직 참조하므로
+                // 이번에는 남고, 다음 저장으로 직전 원문에서도 빠지면 그때 지워진다
+                memoryStore.deferPhotoRelease(memory.photoUri);
                 sweepReleasedPhotos();
                 if (detailDialog != null) detailDialog.dismiss();
                 refreshMemoryViews();
@@ -1288,7 +1291,11 @@ public class MainActivity extends Activity {
         @Override
         public void onClearPhoto() {
             // 직접 고른 사진·고정 추억을 모두 해제하고 기본 배경(assets karaoke → 그라디언트)으로
-            saveKaraokePhoto(null);
+            Uri previous = loadKaraokePhoto();
+            if (saveKaraokePhoto(null)) {
+                // 해제된 사진은 추억이 참조하지 않으면 정리된다
+                releaseReplacedPhoto(previous == null ? null : previous.toString(), null);
+            }
             karaokeSessionMemory = null;
             karaokePanel.setBackgroundPhoto(null);
         }

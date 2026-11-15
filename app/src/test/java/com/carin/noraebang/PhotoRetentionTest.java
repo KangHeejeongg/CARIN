@@ -128,6 +128,34 @@ public class PhotoRetentionTest {
         assertFalse("손상 백업도 prev도 참조하지 않는 사진은 없다(B는 prev가 참조)", pending.isEmpty());
     }
 
+    /** MainActivity.confirmDeleteMemory 흐름: 삭제 저장 → 지운 추억의 사진을 삭제 대기 → 정리 */
+    private void deleteMemoryWithPhoto(String photo) {
+        previous = current;
+        current = raw();
+        pending.add(photo);
+        sweep(Collections.emptyList());
+    }
+
+    @Test
+    public void deletedMemoryPhoto_isKeptForRestoreThenReleasedAfterNextWrite() {
+        start(PHOTO_A);
+        deleteMemoryWithPhoto(PHOTO_A);
+
+        assertTrue("삭제 직후 memories_prev가 A를 참조하므로 복원할 수 있게 남아야 한다", files.contains(PHOTO_A));
+        Memory restored = MemoryCodec.decode(previous).memories.get(0);
+        assertEquals(PHOTO_A, restored.photoUri);
+
+        // 다음 저장(새 추억 등록)으로 직전 원문에서도 A가 빠진다
+        files.add(PHOTO_B);
+        previous = current;
+        current = raw(new Memory("m2", "부산", "부산 여행", "2025-09-01", "carin_song_02", 2L, false, PHOTO_B));
+        sweep(Collections.emptyList());
+
+        assertFalse("어디에서도 참조하지 않게 된 삭제 추억의 사진은 지워진다", files.contains(PHOTO_A));
+        assertTrue(pending.isEmpty());
+        assertTrue(files.contains(PHOTO_B));
+    }
+
     @Test
     public void photoInUseOutsideStore_isNotReleased() {
         pending.add(PHOTO_A);

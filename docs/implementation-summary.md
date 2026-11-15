@@ -105,7 +105,8 @@ FrameLayout (앱 배경: Deep Vinyl + 상단 코랄 빛)
    ├─ 가사 영역 터치 → 왼쪽 1/3 이전 줄, 나머지 다음 줄 (동기화 없음)
    ├─ 사진 선택 → startPhotoPicker(REQ_PICK_KARAOKE_PHOTO) → 내부 복사 → prefs 저장 → 배경 적용
    ├─ onBackPressed / ✕ → closeKaraoke()
-   └─ onResume: 열려 있으면 UXR 재확인, 주차 아니면 닫음
+   ├─ onResume: 열려 있으면 UXR 재확인, 주차 아니면 닫음
+   └─ onStart~onStop: DrivingSafetyGuard.startMonitoring() → UXR 변경 시 노래방·등록/삭제 창 닫음
 ```
 
 ## 4. 재생 구조 (Media3 MediaLibraryService)
@@ -169,6 +170,7 @@ onActivityResult: (추억이면 보호 상태 재확인) → PhotoImporter.impor
          실패(보호 상태/대상 없음/저장 실패) → 새 파일 삭제, 기존 연결 유지
          성공 → releaseReplacedPhoto(이전 URI): 삭제 대기(photos_pending_release)에 넣고 sweepReleasedPhotos()
    노래방: applyKaraokePhoto → prefs commit → 실패 시 새 파일 삭제 / 성공 시 이전 파일을 삭제 대기 + 정리
+   해제: 추억 삭제 성공 → 그 추억 사진을 삭제 대기 / 노래방 기본 배경 commit 성공 → 이전 사진을 삭제 대기 (둘 다 정리 호출)
 
 sweepReleasedPhotos() (추억 저장 성공 뒤마다: 등록·삭제·사진 연결·데모 생성)
    PhotoRetention.releasable(대기 목록, 보관본[현재 원문, memories_prev, memories_backup, memory_backups/*.json], 노래방 설정)
@@ -180,7 +182,7 @@ sweepReleasedPhotos() (추억 저장 성공 뒤마다: 등록·삭제·사진 �
 
 - Activity가 가져오는 도중 종료되면 새 파일을 지운다.
 - 표시: `ImageLoader`가 백그라운드에서 축소 디코딩하고, 같은 뷰에 더 최근 요청이 있으면 이전 결과를 버린다.
-- 범위 밖(후속): 기존 사진의 일괄 변환, 추억 삭제·노래방 "기본 배경" 시 파일 정리, 고아 파일 일괄 정리.
+- 범위 밖(후속): 기존 사진의 일괄 변환, 고아 파일 일괄 정리.
 - 검증: `PhotoSizingTest`(축소 크기), 에뮬레이터에서 큰 사진·회전 사진·잘못된 이미지·같은 사진 재연결·재실행·덮어 설치, debug 실패 주입(저장 실패·JPEG 쓰기 실패)과 `run-as --user 10`으로 파일 목록 확인.
 
 ## 8. SDK / 플랫폼 API (소스 jar에서 확인한 것만 사용)
