@@ -14,6 +14,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -171,6 +172,8 @@ public class MainActivity extends Activity {
     private static final String KEY_KARAOKE_PHOTO = "background_uri";
 
     private KaraokePanel karaokePanel;
+    /** 메인 화면(헤더·탭·페이지·미니 플레이어). 노래방이 열린 동안 포커스를 막는다 */
+    private LinearLayout mainContent;
     /** 추억 상세에서 노래방에 들어왔을 때 이 세션 동안 고정할 추억 (null이면 곡에 따라 자동 선택) */
     private Memory karaokeSessionMemory;
     private CarinDialog detailDialog;
@@ -239,6 +242,7 @@ public class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(36), dp(16), dp(36), dp(20));
         frame.addView(root, new FrameLayout.LayoutParams(-1, -1));
+        mainContent = root;
 
         root.addView(createHeader(), new LinearLayout.LayoutParams(-1, dp(104)));
         root.addView(createTabs(), below(-1, dp(72), 8));
@@ -264,6 +268,7 @@ public class MainActivity extends Activity {
         frame.addView(karaokePanel, new FrameLayout.LayoutParams(-1, -1));
 
         setContentView(frame);
+        CarinTheme.installFocusRings(frame);
         selectTab(TAB_PLAYLIST);
     }
 
@@ -1340,6 +1345,9 @@ public class MainActivity extends Activity {
         karaokeSessionMemory = sessionMemory;
         applyKaraokeBackground();
         karaokePanel.setVisibility(View.VISIBLE);
+        // 로터리·방향키 포커스가 노래방 뒤에 가려진 메인 화면으로 새지 않게 막고, 재생 버튼에서 시작한다
+        mainContent.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+        karaokePanel.focusPrimaryControl();
         updateTabHighlight();
     }
 
@@ -1371,6 +1379,7 @@ public class MainActivity extends Activity {
 
     private void closeKaraoke() {
         karaokePanel.setVisibility(View.GONE);
+        mainContent.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
         updateTabHighlight();
     }
 

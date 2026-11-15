@@ -77,7 +77,7 @@
    - 사진이 없거나 열 수 없으면 기본 배경 유지
    - 배경 순서: 지금 곡과 연결된 추억 사진 → 노래방에서 고른 사진 → 기본 노래방 이미지. 곡을 넘기면 배경도 그 곡의 추억 사진으로 바뀝니다
 5. **기본 배경** 으로 되돌리기
-6. **✕** 또는 뒤로가기 → 메인으로 복귀 (재생 상태 유지)
+6. **✕** 또는 뒤로가기 → 메인으로 복귀 (재생 상태 유지). 메인 화면에서 뒤로가기를 누르면 앱이 종료되지 않고 숨겨지며 음악은 계속 재생됩니다
 7. (연계) 카인 추억 상세의 **사진 연결** 로 사진을 붙인 뒤 **노래방** 을 누르면 그 추억의 노래 + 사진 배경으로 노래방이 열립니다.
 
 > 에뮬레이터에 사진이 없다면: `adb shell content insert --user 10 --uri content://media/external/images/media --bind _display_name:s:trip.png --bind mime_type:s:image/png --bind relative_path:s:Pictures/` 로 행을 만든 뒤 `adb shell "content write --user 10 --uri content://media/external/images/media/<id> < /data/local/tmp/trip.png"` 로 바이트를 넣으면 포토 피커에 나타납니다. (`adb push` 로 `/data/local/tmp/`에 먼저 올려 두세요.)
@@ -91,6 +91,9 @@
 | 데모 목적지 해제 | 데모 목적지 창 → **데모 목적지 해제** | 헤더 칩 `목적지 없음`, 히어로 카드 기본 문구 |
 | 영속성 | `adb shell am force-stop com.carin.noraebang` 후 재실행 | 추억·노래방 배경 유지 |
 | 주행 안전 | 주행 중(CarUxRestrictions DO 필요) 상태에서 추억 등록/삭제/노래방/사진 | 토스트로 차단, 헤더 칩 `● 주행 중 · 음악 재생만 가능`, 음악 재생은 계속 |
+| 주행 시작 시 자동 닫힘 | 노래방이나 추억 등록·삭제 확인 창을 연 채 주행 시작 | 창이 바로 닫히고 안내 토스트. debug 빌드는 `adb shell am start --activity-single-top --user 10 -n com.carin.noraebang/.MainActivity --ez carin_debug_simulate_driving true`로 재현 |
+| 세로 분할 창 | 다른 앱을 연 뒤 창 경계(⋮)를 끌어 CAR IN을 세로 창으로 | 히어로가 카드 전체 너비로, 노래방 안내 칩이 곡 제목 아래로 옮겨지고 글자가 잘리지 않음 |
+| 로터리·방향키 | 방향키(또는 CCP 노브)로 이동 · 가운데 키로 선택 | 포커스 받은 버튼·행에 라이트 로즈 테두리. 노래방이 열려 있으면 노래방 안에서만 이동 |
 | 개발 정보 | MEMORY ROUTE 패널 하단 **개발 정보 · Vehicle SDK** | 펼치면 조수석 착좌 상태 조회(Vehicle SDK) |
 
 ## 9. 자주 묻는 질문

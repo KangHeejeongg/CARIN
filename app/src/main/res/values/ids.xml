@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CarinTheme: 포커스 테두리를 이미 붙인 뷰 표시용 태그 키 -->
+    <item name="carin_focus_ring" type="id" />
+</resources>

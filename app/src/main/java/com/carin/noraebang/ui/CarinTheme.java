@@ -7,11 +7,16 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.RippleDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import com.carin.noraebang.R;
 
 /**
  * CAR IN 브랜드 팔레트(노을 로즈 · 다크 모드)와 공통 뷰 팩토리.
@@ -178,5 +183,61 @@ public final class CarinTheme {
     /** "2025-08-15" → "2025.08.15" */
     public static String displayDate(String isoDate) {
         return isoDate == null ? "" : isoDate.replace('-', '.');
+    }
+    // ── 로터리(CCP)·방향키 포커스 표시 ──
+
+    /** 포커스 테두리를 이미 붙인 뷰 표시용 태그 키 */
+    private static final int FOCUS_RING_TAG = R.id.carin_focus_ring;
+
+    /**
+     * 뷰 트리의 모든 클릭 가능한 뷰에 포커스 테두리를 붙이고, 이후 동적으로 추가되는 뷰에도
+     * 레이아웃이 바뀔 때마다 붙인다. Pleos CCP 가이드: 로터리로 옮긴 포커스가 눈에 보여야 한다.
+     *
+     * @param root 감시할 루트 뷰 (Activity 콘텐츠 또는 다이얼로그 카드)
+     */
+    public static void installFocusRings(ViewGroup root) {
+        applyFocusRings(root);
+        root.getViewTreeObserver().addOnGlobalLayoutListener(
+                (ViewTreeObserver.OnGlobalLayoutListener) () -> applyFocusRings(root));
+    }
+
+    /**
+     * 하위 뷰 중 클릭 가능한 뷰에 포커스 테두리를 한 번씩 붙인다.
+     * {@code setFocusable(false)}로 명시한 뷰(터치 전용 영역)는 건너뛴다.
+     *
+     * @param view 검사할 뷰
+     */
+    public static void applyFocusRings(View view) {
+        if (view.isClickable() && view.isFocusable() && view.getTag(FOCUS_RING_TAG) == null) {
+            float radius = (view instanceof PillButton || view instanceof CircleButton) ? 999 : 24;
+            addFocusRing(view, radius);
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                applyFocusRings(group.getChildAt(i));
+            }
+        }
+    }
+
+    /**
+     * 포커스를 받았을 때만 보이는 라이트 로즈 테두리를 전경에 겹친다. 기존 전경(리플)은 유지한다.
+     *
+     * @param view     대상 뷰
+     * @param radiusDp 테두리 모서리 반경 (dp, 999면 알약·원)
+     */
+    public static void addFocusRing(View view, float radiusDp) {
+        Context context = view.getContext();
+        GradientDrawable ring = new GradientDrawable();
+        ring.setColor(0x26FFAEB5);
+        ring.setStroke(dp(context, 3), LIGHT_ROSE);
+        ring.setCornerRadius(dp(context, radiusDp));
+        StateListDrawable states = new StateListDrawable();
+        states.addState(new int[] {android.R.attr.state_focused}, ring);
+        Drawable existing = view.getForeground();
+        view.setForeground(existing == null ? states : new LayerDrawable(new Drawable[] {existing, states}));
+        // 시스템 기본 포커스 강조(옅은 회색)는 거의 보이지 않으므로 끄고 위 테두리를 쓴다
+        view.setDefaultFocusHighlightEnabled(false);
+        view.setTag(FOCUS_RING_TAG, Boolean.TRUE);
     }
 }

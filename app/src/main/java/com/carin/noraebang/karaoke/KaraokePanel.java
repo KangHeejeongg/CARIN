@@ -65,6 +65,7 @@ public final class KaraokePanel extends FrameLayout {
         super(context);
         setBackgroundColor(CarinTheme.DEEP_VINYL);
         setClickable(true); // 아래 플레이어 화면으로 터치가 새지 않도록
+        setFocusable(false); // 터치만 막는 판이므로 로터리 포커스 대상은 아니다
 
         // 1. 배경 사진 (없으면 assets 기본 사진 → 노을 그라디언트)
         backgroundImage = new ImageView(context);
@@ -160,6 +161,9 @@ public final class KaraokePanel extends FrameLayout {
         backZone.setOnClickListener(v -> showLine(lineIndex - 1));
         View forwardZone = new View(context);
         forwardZone.setOnClickListener(v -> showLine(lineIndex + 1));
+        // 가사 넘기기는 터치 전용 부가 기능이다. 로터리 포커스는 하단 조작 버튼으로만 이동한다
+        backZone.setFocusable(false);
+        forwardZone.setFocusable(false);
         tapZones.addView(backZone, new LinearLayout.LayoutParams(0, -1, 1));
         tapZones.addView(forwardZone, new LinearLayout.LayoutParams(0, -1, 2));
         lyricsArea.addView(tapZones, new LayoutParams(-1, -1));
@@ -231,6 +235,11 @@ public final class KaraokePanel extends FrameLayout {
 
         setBackgroundPhoto(null);
         setVisibility(GONE);
+    }
+
+    /** 로터리·방향키 사용 중이면 재생 버튼에 포커스를 둔다 (터치 모드에서는 아무 일도 하지 않음) */
+    public void focusPrimaryControl() {
+        playButton.requestFocus();
     }
 
     /** 현재 곡 제목과 데모 가사 표시 (첫 줄부터) */

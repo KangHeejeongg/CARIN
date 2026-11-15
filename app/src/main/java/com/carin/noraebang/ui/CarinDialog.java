@@ -79,6 +79,7 @@ public final class CarinDialog {
         card.addView(buttonRow, rowParams);
 
         dialog.setContentView(card);
+        CarinTheme.installFocusRings(card);
         Window window = dialog.getWindow();
         if (window != null) {
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
