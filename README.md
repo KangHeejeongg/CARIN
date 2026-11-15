@@ -18,9 +18,10 @@ CAR IN은 **다시 찾은 길이 그날의 노래를 먼저 들려주는 차량�
 
 | 항목 | 내용 |
 | --- | --- |
-| 팀 · 앱 이름 | CARIN · **CAR IN (카인)** |
+| 팀 · 앱 이름 | 강희정 · **CAR IN (카인)** |
 | 한 줄 소개 | 같은 길을 다시 달리면, 그날 함께 들은 노래를 먼저 들려주는 차량용 음악·추억 앱 |
 | APK | [`apk/강희정_CARIN_release.apk`](apk/강희정_CARIN_release.apk) · 서명된 release 빌드 (15.9 MB) |
+| 제출 파일명 규칙 | `팀명_앱이름_release.apk` → `강희정_CARIN_release.apk` |
 | 개발·테스트 에뮬레이터 | Pleos Connect Emulator **v2.1.0** (AVD `Pleos_Connect_v2.1.0`, Android 14 / API 34, user build) |
 | 화면 규격 | **2560 × 1440 px, 160 dpi** (17인치 16:9 가로). 앱 창: 가로 약 1682 × 1210 dp, 세로 분할 약 841 × 1210 dp 모두 대응 |
 | 실행 방법 | 아래 [실행 및 빌드](#실행-및-빌드) 참고 |
