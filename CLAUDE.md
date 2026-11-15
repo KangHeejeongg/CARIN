@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 언어: **Java 유지** (Kotlin 금지). 모든 UI는 XML 레이아웃 없이 코드로 생성한다 (`res/layout` 없음).
 - 단일 모듈 `:app`, 단일 화면 `MainActivity` (`android.app.Activity` 상속, AppCompat 아님). 노래방도 별도 Activity가 아니라 같은 Activity 안의 오버레이(`karaoke/KaraokePanel`)다 — Activity를 나누면 `onStop()`에서 플레이어가 해제되어 음악이 끊긴다.
 - 패키지명 `com.carin.noraebang`과 `applicationId`는 브랜드가 바뀌어도 유지한다.
-- Git 저장소가 아니다(작업 디렉터리에 `.git` 없음). 사용자 승인 없이 `git init`/push/공개 설정을 하지 말 것.
+- Git 저장소이며 원격은 GitHub `origin`(`main` 브랜치)이다. 사용자 승인 없이 commit/push/공개 설정 변경을 하지 말 것.
 - 팀명은 `CARIN`, 제출 APK는 `apk/CARIN_CAR_IN_release.apk`.
 
 ## 빌드 / 실행 명령
@@ -17,7 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 ./gradlew assembleDebug                 # 디버그 APK → app/build/outputs/apk/debug/app-debug.apk
 ./gradlew assembleRelease               # 서명된 릴리스 APK (keystore.properties 필요, 없으면 unsigned)
-./gradlew testDebugUnitTest             # JVM 단위 테스트 (PlaceMatcherTest 등)
+./gradlew testDebugUnitTest             # JVM 단위 테스트 18개 (PlaceMatcher·MemoryCodec·PhotoRetention·PhotoSizing)
 ./gradlew testDebugUnitTest --tests "com.carin.noraebang.PlaceMatcherTest"   # 단일 테스트 클래스
 ./gradlew lintVitalRelease              # release 빌드에 포함되는 lint
 ```

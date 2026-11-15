@@ -1,6 +1,6 @@
 # 기능 구현 현황 (Feature Status) — CAR IN
 
-기준일: 2026-11-15 (목업 기준 UI 리디자인 반영) · 검증 환경: Pleos Connect Emulator `Pleos_Connect_v2.1.0` (Android 14 / API 34, 2560×1440 @160dpi, user build)
+기준일: 2026-11-15 (목업 기준 UI 리디자인 · 백그라운드 재생 · 배경 JPEG 변환 반영) · 검증 환경: Pleos Connect Emulator `Pleos_Connect_v2.1.0` (Android 14 / API 34, 2560×1440 @160dpi, user build)
 
 범례 — ✅ **구현 완료**(에뮬레이터 동작 확인) · 🟡 **부분 구현** · 🧪 **데모**(실제 소스 대신 앱 내부 선택/모의) · ⏳ **미검증** · 🗓 **향후 개발**
 
@@ -25,7 +25,7 @@
 | 라인 아이콘 (이모지 대체) | ✅ | `ui/CarinIcon` 17종, 리소스 없이 코드로 그림 |
 | 다이얼로그 다크 테마 통일 | ✅ | `ui/CarinDialog` — 등록·상세·삭제 확인·데모 목적지 선택 |
 | 추억 카드 장식 경로선 | ✅ | `ui/RouteLineView`. **실제 GPS 경로 아님**, 도착 라벨만 추억 장소 |
-| 기본 배경 이미지 슬롯 | ✅ | `app/src/main/assets/backgrounds/{hero,karaoke,memory,default}.png` (1672×941) 적용 |
+| 기본 배경 이미지 슬롯 | ✅ | `app/src/main/assets/backgrounds/{hero,karaoke,memory,default}.jpg` (JPEG 1672×941, 장당 약 250KB) 적용 |
 | 이동 거리·소요 시간 표시 (목업의 228km · 2시간 40분) | 🗓 | GPS 기록이 범위 밖이라 데이터 없음 |
 | 휴대폰 화면 · 공유/저장 (목업 우측) | 🗓 | SNS 공유 범위 밖 |
 
@@ -45,7 +45,7 @@
 | 추억 등록 (제목·장소·날짜·곡) | ✅ | 주차 확인 후, 곡은 알약 탭으로 선택 |
 | 로컬 영속 저장 | ✅ | SharedPreferences + JSON, `photoUri` 선택 필드(하위 호환) |
 | 저장 데이터 손상 보호 | ✅ (단위 테스트) | `MemoryCodec`: 배열 전체 손상 → 쓰기 차단 + 원문 백업, 레코드 일부 손상 → 읽은 기록만 표시하고 원문 레코드는 저장 시 보존. 추억 탭 칩·토스트로 안내. 실제 손상 데이터 주입은 user 10 `run-as` 제한으로 기기에서 미재현 |
-| 추억 검색(장소 기준 매칭) | ✅ | `PlaceMatcher` 토큰 완전 일치, 단위 테스트 3/3 |
+| 추억 검색(장소 기준 매칭) | ✅ | `PlaceMatcher` 토큰 완전 일치, 단위 테스트 `PlaceMatcherTest` 3/3 |
 | NaviHelper 연결 · 목적지 조회 | 🟡 | 연결·조회 왕복 성공. 에뮬레이터에 목적지가 없어 실제 값으로는 ⏳ |
 | 목적지 변경 이벤트 반영 | ⏳ | 코드 연결됨, 이벤트 발생 수단 없음 |
 | 데모 목적지 선택 | 🧪 ✅ | `[DEMO]` 표기, SDK 목적지 우선 |
@@ -103,14 +103,14 @@
 
 | 항목 | 상태 |
 |---|---|
-| `assembleDebug` / `testDebugUnitTest` | ✅ / ✅ (3 tests) |
+| `assembleDebug` / `testDebugUnitTest` | ✅ / ✅ (18 tests: PlaceMatcher 3 · MemoryCodec 6 · PhotoRetention 6 · PhotoSizing 2 · 템플릿 1) |
 | `assembleRelease` (R8, v2 서명) | ✅ |
 | Release 설치·실행 (에뮬레이터, 기존 데이터 유지 업데이트) | ✅ |
-| `apk/CARIN_CAR_IN_release.apk` (리디자인 빌드, 2026-11-15) | ✅ |
+| `apk/CARIN_CAR_IN_release.apk` (백그라운드 재생·JPEG 배경 포함, 15.5MB, 2026-11-15) | ✅ |
+| 배경 PNG → JPEG 변환 (APK 23.7MB → 15.5MB) | ✅ |
 
 ## 🗓 향후 개발 (2차 PT)
 
-- 배경 PNG(장당 약 2.2MB)를 JPG로 바꿔 APK 용량 줄이기
 - Media Center 템플릿 적용 여부 결정(미디어 앱 라이브러리·Tune Knob·하드키 기본 지원), 실차 하드키 검증
 - 실차/실내비 환경에서 SDK 목적지 매칭 검증, `onDestinationArrived` 활용
 - 주행 상태 제한의 실기기 검증, UXR 리스너로 노래방 자동 종료
