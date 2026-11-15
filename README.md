@@ -14,6 +14,17 @@ CAR IN은 **다시 찾은 길이 그날의 노래를 먼저 들려주는 차량�
 
 현대자동차그룹 **Pleos Connect 차량용 앱 개발 공모전** 출품작이며, 이 저장소에는 Pleos Connect 에뮬레이터에서 동작하는 Android MVP가 들어 있습니다.
 
+### 제출 정보
+
+| 항목 | 내용 |
+| --- | --- |
+| 팀 · 앱 이름 | CARIN · **CAR IN (카인)** |
+| 한 줄 소개 | 같은 길을 다시 달리면, 그날 함께 들은 노래를 먼저 들려주는 차량용 음악·추억 앱 |
+| APK | [`apk/CARIN_CAR_IN_release.apk`](apk/CARIN_CAR_IN_release.apk) · 서명된 release 빌드 (15.9 MB) |
+| 개발·테스트 에뮬레이터 | Pleos Connect Emulator **v2.1.0** (AVD `Pleos_Connect_v2.1.0`, Android 14 / API 34, user build) |
+| 화면 규격 | **2560 × 1440 px, 160 dpi** (17인치 16:9 가로). 앱 창: 가로 약 1682 × 1210 dp, 세로 분할 약 841 × 1210 dp 모두 대응 |
+| 실행 방법 | 아래 [실행 및 빌드](#실행-및-빌드) 참고 |
+
 <br>
 
 ## 기획 배경
@@ -200,16 +211,40 @@ flowchart LR
 
 ## 실행 및 빌드
 
-바로 설치할 수 있는 제출 APK는 [`apk/CARIN_CAR_IN_release.apk`](apk/CARIN_CAR_IN_release.apk) (15.9 MB)입니다.
+### 1. 제출 APK로 바로 실행 (권장)
+
+바로 설치할 수 있는 제출 APK는 [`apk/CARIN_CAR_IN_release.apk`](apk/CARIN_CAR_IN_release.apk) (15.9 MB, 서명된 release)입니다.
 
 ```bash
-./gradlew testDebugUnitTest      # 단위 테스트
-./gradlew assembleDebug
+# Pleos Connect Emulator v2.1.0을 켠 뒤
+adb install -r apk/CARIN_CAR_IN_release.apk
+adb shell am start -n com.carin.noraebang/.MainActivity   # 또는 앱 목록에서 CAR IN 실행
+```
+
+- 처음 실행하면 사용법 안내 3장이 나옵니다. 마지막 장의 **강릉역으로 체험하기**를 누르면 바로 시연할 수 있습니다. 데모 추억 3개(강릉·속초·평창)는 첫 실행 때 자동으로 들어갑니다.
+- 이전에 debug 빌드를 설치했다면 서명이 달라 덮어 설치가 되지 않습니다. `adb uninstall com.carin.noraebang` 후 설치하세요.
+
+### 2. 소스에서 빌드
+
+```bash
+./gradlew testDebugUnitTest      # JVM 단위 테스트 19개
+./gradlew assembleDebug          # app/build/outputs/apk/debug/app-debug.apk
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n com.carin.noraebang/.MainActivity
 ```
 
 Windows PowerShell에서는 `./gradlew.bat`을 사용하세요. 서명된 Release APK(`./gradlew assembleRelease`)가 필요하면 저장소에 포함되지 않은 `keystore.properties`를 먼저 설정해야 합니다. 형식은 [`keystore.properties.example`](keystore.properties.example)을 참고하세요.
+
+### 3. 테스트 환경과 필요한 설정
+
+| 항목 | 내용 |
+| --- | --- |
+| 테스트 에뮬레이터 | Pleos Connect Emulator v2.1.0 (Android 14 / API 34, user build) |
+| 화면 규격 | 2560 × 1440 px, 160 dpi, 가로. Driving View 옆 앱 창(가로)과 세로 분할 창 모두 확인 |
+| 차량 상태 | 주차(P). 추억 등록·삭제·사진 선택·노래방은 주차 중에만 열립니다 (`CarUxRestrictions`) |
+| 권한 | 실행 중 따로 허용할 권한 없음. 내비 목적지 조회 권한(`pleos.car.permission.NAVI_ROUTE`)은 일반 권한으로 자동 부여 |
+| 내비 목적지 | 에뮬레이터에 목적지를 설정할 수 없어 `[DEMO]` 시연용 목적지로 시연. 내비 앱에 목적지가 있으면 **목적지 고르기 → 내비에서 불러오기**로 실제 SDK 값을 사용 |
+| 빌드 도구 | Gradle 9.6 wrapper, AGP 9.5.1. Gradle 데몬은 JDK 25를 사용(Android Studio 내장 JBR 25 확인, 없으면 Gradle이 자동으로 받음). Pleos SDK는 `settings.gradle.kts`의 Pleos Maven 저장소에서 자동으로 받음 |
 
 | 항목 | 개발 환경 |
 | --- | --- |
@@ -217,7 +252,6 @@ Windows PowerShell에서는 `./gradlew.bat`을 사용하세요. 서명된 Releas
 | Android | compileSdk 37 · targetSdk 37 · minSdk 28 |
 | 음악 | Media3 ExoPlayer · Session 1.11.1 |
 | 차량 · 내비 SDK | Pleos Vehicle 2.3.2 · NaviHelper 3.0.5 |
-| 확인한 환경 | Pleos Connect Emulator v2.1.0, Android 14 (API 34) |
 
 <br>
 
