@@ -21,3 +21,13 @@ keystore.properties
 
 # Android Studio 로컬 실행 대상 (PC 사용자 경로 포함)
 /.idea/deploymentTargetSelector.xml
+
+/.idea/
+/app/release/          # Android Studio "Generate Signed APK"의 출력 폴더
+/app/debug/
+*.hprof                # 메모리 덤프
+.kotlin/
+.claude/settings.local.json
+CLAUDE.md
+docs/mvp-audit.md
+docs/change-summary.md
